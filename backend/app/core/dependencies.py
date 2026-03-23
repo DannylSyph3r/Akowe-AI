@@ -59,7 +59,11 @@ async def require_coop_exco(
 def require_step_up(action: StepUpAction):
 
     async def _dependency(x_step_up_token: str = Header(...)):
-        payload = decode_token(x_step_up_token)
+        try:
+            payload = decode_token(x_step_up_token)
+        except UnauthorizedException:
+            raise ForbiddenException("Step-up token invalid or expired")
+
         if payload.get("type") != "step_up":
             raise ForbiddenException("Invalid step-up token")
         if payload.get("action") != action.value:
