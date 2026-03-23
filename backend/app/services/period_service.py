@@ -1,4 +1,3 @@
-from datetime import date
 from uuid import UUID
 
 from sqlalchemy import cast, select
@@ -17,7 +16,6 @@ from app.services.schedule_service import (
     ScheduleService,
     compute_next_period_dates,
     compute_period_end_date,
-    compute_period_start,           
     format_period_label,
 )
 

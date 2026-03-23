@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_member
+from app.core.dependencies import get_coop_membership, get_current_member
 from app.core.responses import ApiResponse
 from app.models.member import Member
 from app.schemas.member import (
@@ -39,6 +39,7 @@ async def join_cooperative(
 async def get_balance(
     coop_id: UUID = Query(...),
     current_member: Member = Depends(get_current_member),
+    _membership=Depends(get_coop_membership),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     result = await ContributionService(db).get_member_balance(current_member.id, coop_id)
@@ -50,6 +51,7 @@ async def get_history(
     coop_id: UUID = Query(...),
     page: int = Query(default=1, ge=1),
     current_member: Member = Depends(get_current_member),
+    _membership=Depends(get_coop_membership),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     result = await ContributionService(db).get_member_history(
