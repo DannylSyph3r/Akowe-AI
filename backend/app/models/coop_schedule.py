@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,6 +10,12 @@ from app.models.base import Base, TimestampMixin
 
 class CoopSchedule(Base, TimestampMixin):
     __tablename__ = "coop_schedules"
+    __table_args__ = (
+        CheckConstraint(
+            "frequency IN ('weekly','biweekly','triweekly','monthly','bimonthly','quarterly','yearly')",
+            name="ck_coop_schedules_frequency",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
