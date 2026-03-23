@@ -108,11 +108,8 @@ class AuthService:
         await self.member_repo.update_refresh_token_hash(member.id, None)
         await self.db.commit()
 
-    async def step_up(
-        self, member: Member, pin: str, action: StepUpAction
-    ) -> dict:
-        valid = member.pin_hash is not None and verify_pin(pin, member.pin_hash)
-        if not valid:
+    async def step_up(self, member: Member, pin: str, action: StepUpAction) -> dict:
+        if not verify_pin_constant_time(pin, member.pin_hash):
             raise UnauthorizedException("Invalid credentials")
 
         return {
