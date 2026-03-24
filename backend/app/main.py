@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.database import engine
 from app.core.exceptions import AppException
-from app.routers import auth, cooperatives, members
+from app.routers import auth, cooperatives, members, payments, webhooks
 
 logger = logging.getLogger("akoweai")
 
@@ -104,6 +104,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 app.include_router(auth.router, prefix="/api")
 app.include_router(cooperatives.router, prefix="/api")
 app.include_router(members.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(webhooks.router, prefix="/api")
 
 
 @app.get("/health")

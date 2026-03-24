@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import and_, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cooperative import Cooperative
@@ -151,3 +151,184 @@ class CooperativeRepository:
         """)
         result = await self.db.execute(stmt, {"coop_id": coop_id})
         return [dict(row._mapping) for row in result.fetchall()]
+
+    async def get_paid_count_for_period(
+        self, coop_id: UUID, period_id: UUID
+    ) -> int:
+        """Count contributions with status='paid' for a given period in this coop."""
+        from app.models.contribution import Contribution
+
+        result = await self.db.execute(
+            select(func.count(Contribution.id)).where(
+                and_(
+                    Contribution.cooperative_id == coop_id,
+                    Contribution.period_id == period_id,
+                    Contribution.status == "paid",
+                )
+            )
+        )
+        return result.scalar_one() or 0
+
+    async def get_unpaid_members_for_period(
+        self, coop_id: UUID, period_id: UUID
+    ) -> list[dict]:
+        """
+        Return a list of members with unpaid contributions for the given period.
+        Each dict has: member_id, full_name, phone_number.
+        """
+        from app.models.contribution import Contribution
+        from app.models.member import Member as MemberModel
+
+        result = await self.db.execute(
+            select(MemberModel.id, MemberModel.full_name, MemberModel.phone_number)
+            .join(Contribution, Contribution.member_id == MemberModel.id)
+            .where(
+                and_(
+                    Contribution.cooperative_id == coop_id,
+                    Contribution.period_id == period_id,
+                    Contribution.status == "unpaid",
+                )
+            )
+        )
+        rows = result.all()
+        return [
+            {
+                "member_id": row.id,
+                "full_name": row.full_name,
+                "phone_number": row.phone_number,
+            }
+            for row in rows
+        ]
+
+    async def get_active_member_phones(
+        self, coop_id: UUID
+    ) -> list[tuple[str, str]]:
+        """
+        Return (phone_number, full_name) tuples for all active members of the coop.
+        """
+        from app.models.member import Member as MemberModel
+
+        result = await self.db.execute(
+            select(MemberModel.phone_number, MemberModel.full_name)
+            .join(CoopMember, CoopMember.member_id == MemberModel.id)
+            .where(CoopMember.cooperative_id == coop_id)
+        )
+        return [(row.phone_number, row.full_name) for row in result.all()]
+
+    async def search_members_by_name(
+        self, coop_id: UUID, query: str
+    ) -> list[dict]:
+        """
+        Fuzzy member name search within a cooperative using ILIKE.
+        Returns member_id, full_name, role.
+        """
+        from app.models.member import Member as MemberModel
+
+        pattern = f"%{query}%"
+        result = await self.db.execute(
+            select(
+                MemberModel.id,
+                MemberModel.full_name,
+                CoopMember.role,
+            )
+            .join(CoopMember, CoopMember.member_id == MemberModel.id)
+            .where(
+                and_(
+                    CoopMember.cooperative_id == coop_id,
+                    MemberModel.full_name.ilike(pattern),
+                )
+            )
+            .order_by(MemberModel.full_name)
+            .limit(10)
+        )
+        rows = result.all()
+        return [
+            {
+                "member_id": row.id,
+                "full_name": row.full_name,
+                "role": row.role,
+            }
+            for row in rows
+        ]
+
+    async def get_financial_summary(
+        self, coop_id: UUID, days: int = 30
+    ) -> dict:
+        """
+        Return aggregated financial data for the last N days.
+        Used by AI summary flows.
+        """
+        from datetime import datetime, timedelta, timezone
+        from app.models.contribution import Contribution
+        from app.models.contribution_period import ContributionPeriod
+
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Contributions paid in the last N days
+        contrib_result = await self.db.execute(
+            select(func.coalesce(func.sum(Contribution.amount), 0)).where(
+                and_(
+                    Contribution.cooperative_id == coop_id,
+                    Contribution.status == "paid",
+                    Contribution.paid_at >= since,
+                )
+            )
+        )
+        contributions_kobo = contrib_result.scalar_one() or 0
+
+        # Outstanding unpaid contributions (all time)
+        unpaid_result = await self.db.execute(
+            select(func.coalesce(func.sum(Contribution.amount), 0)).where(
+                and_(
+                    Contribution.cooperative_id == coop_id,
+                    Contribution.status == "unpaid",
+                )
+            )
+        )
+        outstanding_debt_kobo = unpaid_result.scalar_one() or 0
+
+        # Current open period for collection-rate calculation
+        open_period_result = await self.db.execute(
+            select(ContributionPeriod.id).where(
+                and_(
+                    ContributionPeriod.cooperative_id == coop_id,
+                    ContributionPeriod.closed_at.is_(None),
+                )
+            ).order_by(ContributionPeriod.period_number.desc()).limit(1)
+        )
+        open_period_id = open_period_result.scalar_one_or_none()
+
+        paid_count = 0
+        total_count = 0
+        if open_period_id:
+            paid_r = await self.db.execute(
+                select(func.count(Contribution.id)).where(
+                    and_(
+                        Contribution.cooperative_id == coop_id,
+                        Contribution.period_id == open_period_id,
+                        Contribution.status == "paid",
+                    )
+                )
+            )
+            paid_count = paid_r.scalar_one() or 0
+
+            total_r = await self.db.execute(
+                select(func.count(Contribution.id)).where(
+                    and_(
+                        Contribution.cooperative_id == coop_id,
+                        Contribution.period_id == open_period_id,
+                    )
+                )
+            )
+            total_count = total_r.scalar_one() or 0
+
+        collection_rate = int(paid_count / total_count * 100) if total_count else 0
+
+        return {
+            "contributions_kobo": int(contributions_kobo),
+            "withdrawals_kobo": 0,  # Phase 8 — withdrawal model not queried yet
+            "outstanding_debt_kobo": int(outstanding_debt_kobo),
+            "paid_count": paid_count,
+            "total_count": total_count,
+            "collection_rate_pct": collection_rate,
+        }

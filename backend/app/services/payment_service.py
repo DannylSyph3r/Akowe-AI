@@ -110,18 +110,14 @@ class PaymentService:
         return transaction
 
     def build_payment_initiation_url(self, reference: str) -> str:
-        """
-        Returns the URL for the WhatsApp CTA button.
-        This points to our bridge page which auto-submits the form to Interswitch.
-        """
-        return f"{settings.railway_backend_url}/api/payments/initiate/{reference}"
+        return f"{settings.prod_url}/api/payments/initiate/{reference}" 
 
     async def poll_transaction_status(
         self, reference: str, amount_kobo: int
     ) -> dict:
         """
         Query Interswitch for authoritative transaction status.
-        Returns the raw response dict. Caller must check ResponseCode.
+        Uses v2 API — reference is appended as a query param, Bearer token required.
         """
         try:
             token = await _get_interswitch_token()
@@ -129,19 +125,14 @@ class PaymentService:
             logger.error("Failed to obtain Interswitch token: %s", e)
             raise
 
-        url = settings.interswitch_query_url
-        params = {
-            "merchantcode": settings.interswitch_merchant_code,
-            "transactionreference": reference,
-            "amount": amount_kobo,
-        }
+        url = f"{settings.interswitch_query_url}?transactionReference={reference}"
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(
                 url,
-                params=params,
                 headers={
                     "Accept": "application/json",
+                    "Content-Type": "application/json",
                     "Authorization": f"Bearer {token}",
                 },
             )
