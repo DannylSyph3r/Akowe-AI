@@ -1,6 +1,4 @@
 import logging
-from typing import TYPE_CHECKING
-
 from app.core.enums import ConversationFlow, Intent
 from app.models.conversation_session import ConversationSession
 from app.models.member import Member

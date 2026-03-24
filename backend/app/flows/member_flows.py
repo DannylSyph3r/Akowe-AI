@@ -16,7 +16,6 @@ from app.services.whatsapp_service import (
     send_reply_buttons,
     send_text_message,
 )
-from app.core.phone import normalize_nigerian_phone
 
 logger = logging.getLogger("akoweai")
 
