@@ -12,6 +12,7 @@ from app.models.conversation_session import ConversationSession
 from app.repositories.member_repository import MemberRepository
 from app.services.intent_service import route_message
 from app.services.session_service import load_or_create_session, save_session
+from app.services.whatsapp_service import send_text_message
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 settings = get_settings()
@@ -85,16 +86,25 @@ async def _process_whatsapp_message(payload: dict) -> None:
         try:
             message_data = extract_message_data(payload)
             if message_data is None:
-                return  # Silently ignore status updates and non-message events
+                # Silently ignore status updates and non-message events
+                return
 
             phone = message_data.get("phone", "")
             if not phone:
                 return
 
-            # Load or create conversation session
-            session = await load_or_create_session(phone, db)
+            # Load or create conversation session — get expiry flag
+            session, was_expired = await load_or_create_session(phone, db)
 
-            # If this is a text message, store the text in flow_data so flow handlers can read it
+            # Notify user if their previous flow session timed out
+            if was_expired:
+                await send_text_message(
+                    phone,
+                    "⏱ Your previous session timed out. Starting fresh!",
+                )
+
+            # If this is a text message, store the text in flow_data so flow
+            # handlers can read it (blocking flows use current_text)
             if message_data.get("message_type") == "text":
                 session.flow_data = {
                     **session.flow_data,
