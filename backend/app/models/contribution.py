@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +10,10 @@ from app.models.base import Base, TimestampMixin
 
 class Contribution(Base, TimestampMixin):
     __tablename__ = "contributions"
-    __table_args__ = (UniqueConstraint("member_id", "period_id"),)
+    __table_args__ = (
+        UniqueConstraint("member_id", "period_id"),
+        CheckConstraint("status IN ('unpaid','paid')", name="ck_contributions_status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -28,9 +31,7 @@ class Contribution(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("pools.id"), nullable=True
     )
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="unpaid"
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="unpaid")
     paid_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
