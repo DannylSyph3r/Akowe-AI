@@ -44,10 +44,7 @@ def _format_naira(amount_kobo: int) -> str:
     return f"₦{amount_kobo / 100:,.0f}"
 
 
-# ---------------------------------------------------------------------------
 # Coop status
-# ---------------------------------------------------------------------------
-
 async def handle_coop_status_intent(
     phone: str,
     member: Member,
@@ -117,10 +114,7 @@ async def handle_coop_status_intent(
     )
 
 
-# ---------------------------------------------------------------------------
 # Member lookup flow
-# ---------------------------------------------------------------------------
-
 async def handle_member_lookup_flow(
     phone: str,
     session: ConversationSession,
@@ -225,10 +219,7 @@ async def _send_member_detail(
     await send_text_message(phone, "\n".join(lines))
 
 
-# ---------------------------------------------------------------------------
 # Broadcast flow
-# ---------------------------------------------------------------------------
-
 async def handle_broadcast_flow(
     phone: str,
     session: ConversationSession,
@@ -281,6 +272,9 @@ async def handle_broadcast_flow(
             return
 
         coop_repo = CooperativeRepository(db)
+        coop = await coop_repo.get_by_id(coop_id)
+        coop_name = coop.name if coop else "your cooperative"
+        
         member_phones = await coop_repo.get_active_member_phones(coop_id)
 
         sent_count = 0
@@ -293,6 +287,7 @@ async def handle_broadcast_flow(
                         {
                             "type": "body",
                             "parameters": [
+                                {"type": "text", "text": coop_name},
                                 {"type": "text", "text": message_text},
                             ],
                         }
@@ -308,10 +303,7 @@ async def handle_broadcast_flow(
         await send_text_message(phone, f"✅ Broadcast sent to {sent_count} member(s).")
 
 
-# ---------------------------------------------------------------------------
 # AI financial summary
-# ---------------------------------------------------------------------------
-
 async def handle_coop_summary_intent(
     phone: str,
     member: Member,
@@ -351,10 +343,7 @@ async def handle_coop_summary_intent(
     await send_text_message(phone, f"📊 *Financial Summary*\n\n{summary}")
 
 
-# ---------------------------------------------------------------------------
 # Send reminders
-# ---------------------------------------------------------------------------
-
 async def handle_send_reminders_intent(
     phone: str,
     member: Member,
@@ -376,9 +365,10 @@ async def handle_send_reminders_intent(
         return
 
     coop = await coop_repo.get_by_id(coop_id)
-    coop_name = coop.name if coop else "your cooperative"
-    amount_str = _format_naira(coop.contribution_amount) if coop else "the contribution amount"
-    due_date = open_period.due_date.strftime("%d %b %Y")
+    
+    amount = f"{coop.contribution_amount / 100:,.0f}" if coop else "0" 
+    due_date_str = open_period.due_date.strftime("%d %b %Y")
+    period_label = open_period.start_date.strftime("%B %Y")
 
     sent_count = 0
     for m in unpaid_members:
@@ -391,9 +381,9 @@ async def handle_send_reminders_intent(
                         "type": "body",
                         "parameters": [
                             {"type": "text", "text": m["full_name"].split()[0]},
-                            {"type": "text", "text": coop_name},
-                            {"type": "text", "text": amount_str},
-                            {"type": "text", "text": due_date},
+                            {"type": "text", "text": amount},
+                            {"type": "text", "text": period_label},
+                            {"type": "text", "text": due_date_str},
                         ],
                     }
                 ],
