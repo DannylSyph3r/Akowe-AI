@@ -26,7 +26,7 @@ class MemberRepository:
         self,
         phone_number: str,
         full_name: str,
-        pin_hash: str,
+        pin_hash: str | None = None,
     ) -> Member:
         member = Member(
             phone_number=phone_number,

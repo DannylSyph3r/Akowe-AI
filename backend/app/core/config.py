@@ -17,12 +17,16 @@ class Settings(BaseSettings):
     meta_phone_number_id: str
     meta_access_token: str
     meta_verify_token: str
+    meta_app_secret: str  # Used for X-Hub-Signature-256 webhook verification
 
     # Interswitch
     interswitch_merchant_code: str = ""
     interswitch_pay_item_id: str = ""
-    interswitch_secret_key: str = ""
+    interswitch_secret_key: str = ""  # OAuth2 client secret AND webhook HMAC key
+    interswitch_client_id: str = ""
+    interswitch_auth_url: str = "https://passport.k8.isw.la/passport/oauth/token"
     interswitch_base_url: str = "https://newwebpay.qa.interswitchng.com"
+    interswitch_query_url: str = "https://qa.interswitchng.com/collections/api/v1/gettransaction.json"
 
     # AI
     gemini_api_key: str = ""
@@ -36,25 +40,22 @@ class Settings(BaseSettings):
     # Internal
     internal_cron_secret: str
     frontend_url: str = ""
+    railway_backend_url: str = ""  # Public backend URL, no trailing slash
 
     @property
     def async_database_url(self) -> str:
-        """Return asyncpg-compatible URL for the async engine."""
         url = self.database_url
         if url.startswith("postgresql://"):
             return url.replace("postgresql://", "postgresql+asyncpg://", 1)
         if url.startswith("postgres://"):
-            # Railway sometimes emits postgres:// shorthand
             return url.replace("postgres://", "postgresql+asyncpg://", 1)
         return url
 
     @property
     def sync_database_url(self) -> str:
-        """Return psycopg2-compatible URL for Alembic migrations."""
         url = self.database_url
         if url.startswith("postgres://"):
             return url.replace("postgres://", "postgresql://", 1)
-        # Strip +asyncpg if someone stored the async URL directly
         return url.replace("+asyncpg", "")
 
 
