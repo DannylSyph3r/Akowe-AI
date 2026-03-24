@@ -1,19 +1,24 @@
 from uuid import UUID
 
 from fastapi import Depends, Header
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.enums import Role, StepUpAction
 from app.core.exceptions import ForbiddenException, UnauthorizedException
-from app.core.security import decode_token, oauth2_scheme
+from app.core.security import bearer_scheme, decode_token
 from app.models.member import Member
 
 
 async def get_current_member(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> Member:
+    if credentials is None:
+        raise UnauthorizedException("Authentication required")
+
+    token = credentials.credentials
     payload = decode_token(token)
 
     if payload.get("type") != "access":

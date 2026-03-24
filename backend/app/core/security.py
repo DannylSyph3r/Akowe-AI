@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.hash import bcrypt
 
@@ -12,7 +12,11 @@ from app.core.exceptions import UnauthorizedException
 
 settings = get_settings()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+bearer_scheme = HTTPBearer(
+    scheme_name="bearerAuth",
+    description="JWT Bearer Token Authentication",
+    auto_error=False,
+)
 
 
 

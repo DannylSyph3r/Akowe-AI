@@ -24,12 +24,3 @@ class ApiResponse(BaseModel, Generic[T]):
             message=message,
             data=data,
         )
-
-    @classmethod
-    def no_content(cls, message: str = "OK") -> "ApiResponse":
-        return cls(
-            is_successful=True,
-            status_code=200,
-            message=message,
-            data=None,
-        )
