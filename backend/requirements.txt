@@ -1,0 +1,25 @@
+# Web framework
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+
+# Database
+sqlalchemy==2.0.48
+alembic==1.18.4
+psycopg2-binary==2.9.10
+asyncpg==0.30.0
+
+# Auth
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+
+# HTTP client
+httpx==0.28.1
+
+# AI
+google-genai==1.67.0
+google-adk==1.27.2
+
+# Utilities
+python-dotenv==1.0.1
+python-dateutil==2.9.0.post0
+pydantic-settings==2.13.1
