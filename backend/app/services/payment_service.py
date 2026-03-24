@@ -109,12 +109,12 @@ class PaymentService:
         await self.db.refresh(transaction)
         return transaction
 
-    def build_payment_initiation_url(self, reference: str) -> str:
-        """
-        Returns the URL for the WhatsApp CTA button.
-        Points to our bridge page which auto-submits the form to Interswitch.
-        """
-        return f"{settings.prod_url}/api/payments/initiate/{reference}"
+def build_payment_initiation_url(self, reference: str) -> str:
+    """
+    Returns the URL for the WhatsApp CTA button.
+    Points to our bridge page which auto-submits the form to Interswitch.
+    """
+    return f"{settings.prod_url}/api/payments/initiate/{reference}"
 
     async def poll_transaction_status(
         self, reference: str, amount_kobo: int
