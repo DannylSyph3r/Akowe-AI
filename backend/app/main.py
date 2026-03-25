@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.database import engine
 from app.core.exceptions import AppException
@@ -45,6 +46,19 @@ async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     errors = exc.errors()
+
+    # Malformed JSON is a 400 Bad Request, not a validation error
+    if errors and errors[0].get("type") == "json_invalid":
+        return JSONResponse(
+            status_code=400,
+            content={
+                "is_successful": False,
+                "status_code": 400,
+                "message": "Malformed request body",
+                "data": None,
+            },
+        )
+
     message = errors[0]["msg"] if errors else "Validation error"
     message = message.removeprefix("Value error, ")
     return JSONResponse(
@@ -53,6 +67,21 @@ async def validation_exception_handler(
             "is_successful": False,
             "status_code": 422,
             "message": message,
+            "data": None,
+        },
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "is_successful": False,
+            "status_code": exc.status_code,
+            "message": exc.detail or "Request error",
             "data": None,
         },
     )
@@ -72,9 +101,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-app.include_router(auth.router)
-app.include_router(cooperatives.router)
-app.include_router(members.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(cooperatives.router, prefix="/api")
+app.include_router(members.router, prefix="/api")
 
 
 @app.get("/health")

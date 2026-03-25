@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -61,13 +62,13 @@ async def refresh(
     )
 
 
-@router.post("/logout")
+@router.post("/logout", status_code=204)
 async def logout(
     current_member: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
-) -> ApiResponse:
+) -> Response:
     await AuthService(db).logout(current_member)
-    return ApiResponse.no_content("Logged out successfully")
+    return Response(status_code=204)
 
 
 @router.post("/step-up")
@@ -83,7 +84,7 @@ async def step_up(
     )
 
 
-@router.get("/reset-pin")
+@router.post("/reset-pin")
 async def reset_pin() -> ApiResponse:
     raise NotImplementedException(
         "PIN reset is not yet available. Please contact your cooperative administrator."

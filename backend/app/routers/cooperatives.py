@@ -79,7 +79,7 @@ async def get_cooperative(
     return ApiResponse.success(data=CooperativeDetailResponse(**result), message="OK")
 
 
-@router.put("/{coop_id}/settings")
+@router.patch("/{coop_id}/settings")
 async def update_settings(
     coop_id: UUID,
     body: UpdateSettingsRequest,
