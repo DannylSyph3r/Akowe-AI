@@ -11,13 +11,13 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
-    readonly_database_url: str = ""
+    readonly_database_url: str = ""  # Phase 11 — not used yet
 
     # WhatsApp / Meta
     meta_phone_number_id: str
     meta_access_token: str
     meta_verify_token: str
-    meta_app_secret: str  # Used for X-Hub-Signature-256 webhook verification
+    meta_app_secret: str  # X-Hub-Signature-256 webhook verification
 
     # Interswitch
     interswitch_merchant_code: str = ""
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     interswitch_client_id: str = ""
     interswitch_auth_url: str = "https://passport.k8.isw.la/passport/oauth/token"
     interswitch_base_url: str = "https://newwebpay.qa.interswitchng.com"
-    interswitch_query_url: str = "https://qa.interswitchng.com/collections/api/v1/gettransaction.json"
+    interswitch_query_url: str = "https://qa.interswitchng.com/collections/api/v2/gettransaction.json"
 
     # AI
     gemini_api_key: str = ""
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # Internal
     internal_cron_secret: str
     frontend_url: str = ""
-    railway_backend_url: str = ""  # Public backend URL, no trailing slash
+    prod_url: str = ""
 
     @property
     def async_database_url(self) -> str:
