@@ -1,3 +1,5 @@
+import logging
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -7,6 +9,8 @@ from fastapi.responses import JSONResponse
 from app.core.database import engine
 from app.core.exceptions import AppException
 from app.routers import auth, cooperatives, members
+
+logger = logging.getLogger("akoweai")
 
 
 @asynccontextmanager
@@ -42,7 +46,6 @@ async def validation_exception_handler(
 ) -> JSONResponse:
     errors = exc.errors()
     message = errors[0]["msg"] if errors else "Validation error"
-    # Strip the pydantic "Value error, " prefix when present
     message = message.removeprefix("Value error, ")
     return JSONResponse(
         status_code=422,
@@ -50,6 +53,20 @@ async def validation_exception_handler(
             "is_successful": False,
             "status_code": 422,
             "message": message,
+            "data": None,
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception on %s", request.url)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "is_successful": False,
+            "status_code": 500,
+            "message": "An unexpected error occurred",
             "data": None,
         },
     )
