@@ -49,7 +49,9 @@ class AuthService:
         await self.db.refresh(member)
 
         return {
-            "member_id": str(member.id),
+            "member_id": member.id,
+            "full_name": member.full_name,
+            "phone_number": member.phone_number,
             "access_token": access_token,
             "refresh_token": refresh_token,
         }
@@ -71,7 +73,9 @@ class AuthService:
         await self.db.commit()
 
         return {
-            "member_id": str(member.id),
+            "member_id": member.id,
+            "full_name": member.full_name,
+            "phone_number": member.phone_number,
             "access_token": access_token,
             "refresh_token": refresh_token,
         }

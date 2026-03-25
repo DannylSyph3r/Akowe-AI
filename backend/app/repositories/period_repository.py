@@ -97,3 +97,12 @@ class PeriodRepository:
             .order_by(ContributionPeriod.period_number)
         )
         return list(result.scalars().all())
+
+    async def get_all_periods(self, coop_id: UUID) -> list[ContributionPeriod]:
+        """All periods for a cooperative, newest first. Used for the history filter dropdown."""
+        result = await self.db.execute(
+            select(ContributionPeriod)
+            .where(ContributionPeriod.cooperative_id == coop_id)
+            .order_by(ContributionPeriod.period_number.desc())
+        )
+        return list(result.scalars().all())

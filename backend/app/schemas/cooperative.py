@@ -83,6 +83,8 @@ class CooperativeDetailResponse(BaseModel):
     contribution_amount_kobo: int
     pool_balance: int
     member_count: int
+    collection_rate_pct: float
+    ytd_collected_kobo: int  
     current_schedule: ScheduleInfo
 
 
@@ -101,6 +103,7 @@ class MemberListItem(BaseModel):
     joined_at: datetime
     risk_level: RiskLevel
     total_contributed: int
+    periods_paid: int
     last_paid_at: datetime | None
 
 
@@ -162,3 +165,36 @@ class PaginatedWithdrawals(BaseModel):
 
 class InsightResponse(BaseModel):
     insight: str
+
+class PeriodListItem(BaseModel):
+    id: UUID
+    period_number: int
+    label: str
+    start_date: date
+    due_date: date
+    is_open: bool
+
+
+class ContributionSummaryItem(BaseModel):
+    member_id: UUID
+    full_name: str
+    total_contributed: int
+    periods_paid: int
+    periods_missed: int
+    last_payment_date: datetime | None
+    risk_level: RiskLevel
+
+
+class PeriodStatusItem(BaseModel):
+    member_id: UUID
+    full_name: str
+    amount: int
+    status: str  # 'paid' | 'unpaid'
+
+
+class BroadcastRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=1000)
+
+
+class BroadcastResponse(BaseModel):
+    sent_to: int

@@ -16,6 +16,7 @@ from app.core.responses import ApiResponse
 from app.models.member import Member
 from app.repositories.cooperative_repository import CooperativeRepository
 from app.prompts.financial_summary import COOP_STATUS_INSIGHT_PROMPT
+from app.repositories.period_repository import PeriodRepository
 from app.schemas.cooperative import (
     CooperativeDetailResponse,
     CooperativeListItem,
@@ -35,6 +36,11 @@ from app.schemas.cooperative import (
     RecordWithdrawalResponse,
     UpdateSettingsRequest,
     WithdrawalListItem,
+    BroadcastRequest,
+    BroadcastResponse,
+    ContributionSummaryItem,
+    PeriodListItem,
+    PeriodStatusItem,
 )
 from app.services.cooperative_service import CooperativeService
 from app.services.gemini_service import GeminiProClient
@@ -285,4 +291,76 @@ async def get_insights(
     return ApiResponse.success(
         data=InsightResponse(insight=insight),
         message="OK",
+    )
+
+
+@router.get("/{coop_id}/periods")
+async def list_periods(
+    coop_id: UUID,
+    _exco=Depends(require_coop_exco),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    items = await PeriodService(db).get_all_periods(coop_id)
+    return ApiResponse.success(
+        data=[PeriodListItem(**item) for item in items],
+        message="OK",
+    )
+
+
+@router.get("/{coop_id}/contributions/summary")
+async def get_contributions_summary(
+    coop_id: UUID,
+    _exco=Depends(require_coop_exco),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    rows = await CooperativeRepository(db).get_contributions_summary(coop_id)
+    items = [
+        ContributionSummaryItem(
+            member_id=row["member_id"],
+            full_name=row["full_name"],
+            total_contributed=row["total_contributed"],
+            periods_paid=row["periods_paid"],
+            periods_missed=max(0, row["periods_total"] - row["periods_paid"]),
+            last_payment_date=row["last_payment_date"],
+            risk_level=(
+                RiskLevel.HIGH if row["late_count"] >= 2
+                else RiskLevel.MEDIUM if row["late_count"] == 1
+                else RiskLevel.LOW
+            ),
+        )
+        for row in rows
+    ]
+    return ApiResponse.success(data=items, message="OK")
+
+
+@router.get("/{coop_id}/contributions/period-status")
+async def get_period_status(
+    coop_id: UUID,
+    period_id: UUID = Query(...),
+    _exco=Depends(require_coop_exco),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    rows = await CooperativeRepository(db).get_period_contributions_status(
+        coop_id, period_id
+    )
+    return ApiResponse.success(
+        data=[PeriodStatusItem(**row) for row in rows],
+        message="OK",
+    )
+
+
+@router.post("/{coop_id}/broadcast")
+async def broadcast_message(
+    coop_id: UUID,
+    body: BroadcastRequest,
+    _exco=Depends(require_coop_exco),
+    _step_up=Depends(require_step_up(StepUpAction.BROADCAST)),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    sent_count = await CooperativeService(db).broadcast_to_members(
+        coop_id, body.message
+    )
+    return ApiResponse.success(
+        data=BroadcastResponse(sent_to=sent_count),
+        message="Broadcast sent",
     )

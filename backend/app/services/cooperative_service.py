@@ -8,6 +8,7 @@ from app.core.exceptions import NotFoundException
 from app.repositories.cooperative_repository import CooperativeRepository
 from app.repositories.schedule_repository import ScheduleRepository
 from app.services.schedule_service import ScheduleService
+import logging; logger = logging.getLogger("akoweai")
 
 
 class CooperativeService:
@@ -72,6 +73,7 @@ class CooperativeService:
 
         schedule = await self.schedule_service.get_active_schedule(coop_id)
         member_count = await self.coop_repo.get_member_count(coop_id)
+        overview = await self.coop_repo.get_overview_stats(coop_id)
 
         return {
             "id": coop.id,
@@ -79,6 +81,8 @@ class CooperativeService:
             "contribution_amount_kobo": coop.contribution_amount,
             "pool_balance": coop.pool_balance,
             "member_count": member_count,
+            "collection_rate_pct": overview["collection_rate_pct"],
+            "ytd_collected_kobo": overview["ytd_collected_kobo"],
             "current_schedule": {
                 "version": schedule.version,
                 "frequency": schedule.frequency,
@@ -137,3 +141,34 @@ class CooperativeService:
         await self.db.commit()
 
         return await self.get_cooperative(coop_id)
+
+    async def broadcast_to_members(self, coop_id: UUID, message: str) -> int:
+        from app.services.whatsapp_service import TEMPLATE_BROADCAST, send_template_message
+
+        coop = await self.coop_repo.get_by_id(coop_id)
+        if not coop:
+            raise NotFoundException("Cooperative not found")
+
+        member_phones = await self.coop_repo.get_active_member_phones(coop_id)
+        sent_count = 0
+
+        for phone, _ in member_phones:
+            try:
+                await send_template_message(
+                    to=phone,
+                    template_name=TEMPLATE_BROADCAST,
+                    components=[
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": coop.name},
+                                {"type": "text", "text": message},
+                            ],
+                        }
+                    ],
+                )
+                sent_count += 1
+            except Exception as exc:
+                logger.warning("Broadcast send failed to %s: %s", phone, exc)
+
+        return sent_count
