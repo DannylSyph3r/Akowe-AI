@@ -20,7 +20,7 @@ class GeminiFlashClient:
 
     def __init__(self):
         self._client = genai.Client(api_key=settings.gemini_api_key)
-        self._model = "gemini-2.0-flash"
+        self._model = "gemini-3-flash-preview"
 
     def _classify_sync(self, text: str, system_prompt: str) -> dict:
         last_error = None
@@ -60,7 +60,7 @@ class GeminiProClient:
 
     def __init__(self):
         self._client = genai.Client(api_key=settings.gemini_api_key)
-        self._model = "gemini-2.0-pro-exp"
+        self._model = "gemini-3.1-pro-preview"
 
     def _summarise_sync(self, context: str, system_prompt: str) -> str:
         try:
