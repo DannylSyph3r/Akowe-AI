@@ -52,8 +52,9 @@ class ConversationFlow(str, Enum):
 
 class StepUpAction(str, Enum):
     SETTINGS = "SETTINGS"
+    BROADCAST = "BROADCAST"
     WITHDRAWAL = "WITHDRAWAL"
-
+    
 
 class RiskLevel(str, Enum):
     LOW = "LOW"
