@@ -58,6 +58,21 @@ class Settings(BaseSettings):
             return url.replace("postgres://", "postgresql://", 1)
         return url.replace("+asyncpg", "")
 
+    @property
+    def sync_readonly_database_url(self) -> str:
+        """
+        Normalise READONLY_DATABASE_URL to a psycopg2-compatible sync URL.
+        Strips +asyncpg driver if present and normalises the postgres:// prefix.
+        Deviation D26: added to support the synchronous readonly engine for ADK.
+        """
+        url = self.readonly_database_url
+        if not url:
+            return ""
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("+asyncpg", "")
+        return url
+
 
 @lru_cache
 def get_settings() -> Settings:
