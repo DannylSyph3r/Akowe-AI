@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cooperative import Cooperative
 from app.models.coop_member import CoopMember
-from app.models.member import Member
 
 
 class CooperativeRepository:

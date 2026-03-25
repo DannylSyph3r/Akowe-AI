@@ -34,7 +34,6 @@ def compute_period_start(
     scaled = relativedelta(
         years=delta.years * n,
         months=delta.months * n,
-        weeks=delta.weeks * n,
         days=delta.days * n,
     )
     return anchor_date + scaled

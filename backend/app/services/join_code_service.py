@@ -31,6 +31,20 @@ class JoinCodeService:
         self.period_repo = PeriodRepository(db)
         self.schedule_repo = ScheduleRepository(db)
 
+    # Internal helpers
+    def _validate_code(self, join_code: JoinCode | None) -> None:
+        """
+        Assert a join code is present, unredeemed, and unexpired.
+        Raises BadRequestException with a specific message for each failure.
+        Does not redeem — purely validates state.
+        """
+        if not join_code:
+            raise BadRequestException("Invalid join code")
+        if join_code.redeemed_at is not None:
+            raise BadRequestException("This join code has already been used")
+        if join_code.expires_at < datetime.now(timezone.utc):
+            raise BadRequestException("This join code has expired")
+
     async def generate_join_code(
         self, coop_id: UUID, role: Role, expires_in_days: int
     ) -> JoinCode:
@@ -62,32 +76,24 @@ class JoinCodeService:
     async def validate_and_redeem(
         self, code: str, member_id: UUID
     ) -> JoinCode:
-        """Validate and atomically redeem a join code. Raises BadRequestException on any failure."""
+        """
+        Validate and atomically redeem a join code.
+        Used by Phase 6 WhatsApp flows for non-membership code operations.
+        Does NOT create a CoopMember record — caller is responsible for that.
+        """
         join_code = await self.repo.get_by_code(code)
-
-        if not join_code:
-            raise BadRequestException("Invalid join code")
-        if join_code.redeemed_at is not None:
-            raise BadRequestException("This join code has already been used")
-        if join_code.expires_at < datetime.now(timezone.utc):
-            raise BadRequestException("This join code has expired")
-
+        self._validate_code(join_code)
         return await self.repo.redeem(join_code.id, member_id)
 
     async def join_cooperative(self, code: str, member_id: UUID) -> dict:
-        # 1. Validate the code without redeeming (so we can check membership first)
+        # 1. Fetch and validate — do not consume yet
         join_code = await self.repo.get_by_code(code)
-
-        if not join_code:
-            raise BadRequestException("Invalid join code")
-        if join_code.redeemed_at is not None:
-            raise BadRequestException("This join code has already been used")
-        if join_code.expires_at < datetime.now(timezone.utc):
-            raise BadRequestException("This join code has expired")
+        self._validate_code(join_code)
 
         coop_id = join_code.cooperative_id
 
-        # 2. Check membership before we consume the code
+        # 2. Membership check before redemption — don't consume the code
+        #    if the member already belongs to this cooperative
         existing = await self.coop_repo.get_member_role(coop_id, member_id)
         if existing:
             raise ConflictException("You are already a member of this cooperative")
@@ -95,7 +101,7 @@ class JoinCodeService:
         # 3. Atomically redeem
         await self.repo.redeem(join_code.id, member_id)
 
-        # 4. Create the coop membership record
+        # 4. Create the membership record
         await self.coop_repo.create_coop_member(
             coop_id=coop_id,
             member_id=member_id,
@@ -119,7 +125,7 @@ class JoinCodeService:
                 )
             )
 
-        # 6. Resolve next_due_date
+        # 6. Resolve next_due_date for the response
         if open_period:
             next_due_date = open_period.due_date
         else:

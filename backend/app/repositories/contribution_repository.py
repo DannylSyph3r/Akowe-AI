@@ -106,21 +106,27 @@ class ContributionRepository:
         """Batch fetch of paid transaction references for a list of period IDs."""
         if not period_ids:
             return {}
-        result = await self.db.execute(
-            text("""
-                SELECT unnest(period_ids) AS period_id, reference
-                FROM pending_transactions
-                WHERE status = 'paid'
-                  AND period_ids && :period_ids::uuid[]
-            """),
-            {"period_ids": period_ids},
+
+        from sqlalchemy import bindparam
+        from sqlalchemy.dialects.postgresql import ARRAY
+        from sqlalchemy.dialects.postgresql import UUID as PGUUID
+
+        stmt = text("""
+            SELECT unnest(period_ids) AS period_id, reference
+            FROM pending_transactions
+            WHERE status = 'paid'
+              AND period_ids && :period_ids
+        """).bindparams(
+            bindparam("period_ids", value=period_ids, type_=ARRAY(PGUUID()))
         )
-        # First reference found wins (shouldn't be multiple paid tx per period)
+
+        result = await self.db.execute(stmt)
+
         mapping: dict[UUID, str] = {}
         for row in result.fetchall():
-            pid = row.period_id
+            pid = UUID(str(row.period_id))
             if pid not in mapping:
-                mapping[UUID(str(pid))] = row.reference
+                mapping[pid] = row.reference
         return mapping
 
     async def get_amounts_for_periods(

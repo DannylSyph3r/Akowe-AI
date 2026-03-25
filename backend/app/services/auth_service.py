@@ -12,7 +12,7 @@ from app.core.security import (
     hash_pin,
     hash_refresh_token,
     tokens_match,
-    verify_pin,
+    verify_pin_constant_time,
 )
 from app.models.member import Member
 from app.repositories.member_repository import MemberRepository
@@ -57,13 +57,8 @@ class AuthService:
     async def login(self, phone_number: str, pin: str) -> dict:
         member = await self.member_repo.get_by_phone(phone_number)
 
-        # Evaluate all conditions before raising — no enumeration
-        valid = (
-            member is not None
-            and member.pin_hash is not None
-            and verify_pin(pin, member.pin_hash)
-        )
-        if not valid:
+        pin_hash = member.pin_hash if member else None
+        if not verify_pin_constant_time(pin, pin_hash):
             raise UnauthorizedException("Invalid credentials")
 
         access_token = create_access_token(str(member.id))
