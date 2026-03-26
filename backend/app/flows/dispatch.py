@@ -233,17 +233,16 @@ async def dispatch_intent(
         else:
             session.flow_data.pop("history_page", None)
 
-    elif intent == Intent.COOP_STATUS and is_exco:
-        await handle_coop_status_intent(phone, member, coop_id, db)
-
-    elif intent == Intent.VIEW_UNPAID and is_exco:
-        await handle_coop_status_intent(phone, member, coop_id, db)
-
-    elif intent == Intent.SEND_REMINDERS and is_exco:
-        await handle_send_reminders_intent(phone, member, coop_id, db)
-
-    elif intent == Intent.COOP_SUMMARY and is_exco:
-        await handle_coop_summary_intent(phone, member, coop_id, db)
+    elif intent in (Intent.COOP_STATUS, Intent.VIEW_UNPAID, Intent.SEND_REMINDERS, Intent.COOP_SUMMARY):
+        if is_exco:
+            if intent in (Intent.COOP_STATUS, Intent.VIEW_UNPAID):
+                await handle_coop_status_intent(phone, member, coop_id, db)
+            elif intent == Intent.SEND_REMINDERS:
+                await handle_send_reminders_intent(phone, member, coop_id, db)
+            else:
+                await handle_coop_summary_intent(phone, member, coop_id, db)
+        else:
+            await _permission_denied(phone)
 
     elif (
         intent == Intent.BROADCAST
