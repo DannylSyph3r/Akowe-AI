@@ -139,6 +139,7 @@ async def get_members(
                 joined_at=row["joined_at"],
                 risk_level=risk_level,
                 total_contributed=row["total_contributed"],
+                periods_paid=row["periods_paid"],
                 last_paid_at=row["last_paid_at"],
             )
         )

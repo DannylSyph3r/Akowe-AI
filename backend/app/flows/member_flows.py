@@ -289,6 +289,11 @@ async def handle_pay_period_selected(
     selected_periods: list = session.flow_data.get("selected_periods", [])
     selected_total: int = session.flow_data.get("selected_total", 0)
 
+    # Session state was lost (expired + reset) — restart pay flow fresh
+    if not period_options:
+        await handle_pay_intent(phone, member, session, coop_id, db)
+        return
+
     period = period_options.get(row_id)
     if not period:
         await send_text_message(phone, "Sorry, I couldn't find that period. Please try again.")
@@ -323,6 +328,8 @@ async def handle_pay_period_selected(
 
 async def handle_add_period(
     phone: str,
+    member: Member,
+    coop_id: UUID,
     session: ConversationSession,
     db: AsyncSession,
 ) -> None:
@@ -333,7 +340,9 @@ async def handle_add_period(
     period_options: dict = session.flow_data.get("period_options", {})
     selected_periods: list = session.flow_data.get("selected_periods", [])
 
-    # Build the set of already-selected period keys
+    if not period_options:
+        await handle_pay_intent(phone, member, session, coop_id, db)
+        return
     selected_keys = set()
     for p in selected_periods:
         key = p.get("id") or f"future_{p.get('period_number')}"
