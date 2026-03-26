@@ -147,11 +147,15 @@ async def _send_payment_receipt(transaction) -> None:
             from app.repositories.cooperative_repository import CooperativeRepository
             coop = await CooperativeRepository(db).get_by_id(transaction.cooperative_id)
             coop_name = coop.name if coop else "your cooperative"
+            
+            period_label = "Multiple Periods" if len(transaction.period_ids) > 1 else "Current Period"
+
             await dispatch_payment_receipt(
                 phone=member.phone_number,
                 transaction=transaction,
                 coop_name=coop_name,
                 member_name=member.full_name,
+                period_label=period_label
             )
 
 

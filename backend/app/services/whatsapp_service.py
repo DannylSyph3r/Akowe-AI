@@ -148,24 +148,24 @@ async def dispatch_payment_receipt(
     transaction,
     coop_name: str,
     member_name: str,
+    period_label: str
 ) -> None:
     """
     Send the payment_receipt template to the member after a successful payment.
-    Template variables (adjust component indices if your Meta template differs):
-      {{1}} member name
-      {{2}} amount formatted (₦X,XXX)
-      {{3}} cooperative name
     """
-    amount_naira = transaction.amount / 100
-    amount_formatted = f"₦{amount_naira:,.0f}"
+    amount = f"{transaction.amount / 100:,.0f}"
+    date_str = transaction.updated_at.strftime('%d %b %Y') if transaction.updated_at else "Today"
 
     components = [
         {
             "type": "body",
             "parameters": [
-                {"type": "text", "text": member_name},
-                {"type": "text", "text": amount_formatted},
                 {"type": "text", "text": coop_name},
+                {"type": "text", "text": member_name},
+                {"type": "text", "text": period_label},
+                {"type": "text", "text": amount},
+                {"type": "text", "text": transaction.reference},
+                {"type": "text", "text": date_str},
             ],
         }
     ]
