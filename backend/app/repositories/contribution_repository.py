@@ -68,7 +68,7 @@ class ContributionRepository:
         page: int,
         page_size: int,
     ) -> dict:
-        offset = (page - 1) * page_size
+        offset = page * page_size
 
         total_result = await self.db.execute(
             select(func.count(Contribution.id)).where(

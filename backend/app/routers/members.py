@@ -55,6 +55,6 @@ async def get_history(
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     result = await ContributionService(db).get_member_history(
-        current_member.id, coop_id, page, _DEFAULT_PAGE_SIZE
+        current_member.id, coop_id, page - 1, _DEFAULT_PAGE_SIZE
     )
     return ApiResponse.success(data=PaginatedHistory(**result), message="OK")

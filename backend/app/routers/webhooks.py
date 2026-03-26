@@ -129,7 +129,7 @@ async def _process_whatsapp_message(payload: dict) -> None:
             if was_expired:
                 await send_text_message(
                     phone,
-                    "⏱ Your previous session timed out. Starting fresh!",
+                    "⏱ Your session expired after a period of inactivity. Picking up where you left off — your menu is on its way! 👇",
                 )
 
             # If this is a text message, store the text in flow_data so flow
