@@ -208,7 +208,7 @@ async def handle_pay_flow_single(
     label = period.get("label", "Current Period")
 
     await send_cta_url_button(
-        phone=phone,
+        to=phone,
         body=f"💳 Pay your contribution for *{label}*\n\nAmount: *{amount_str}*",
         button_text="Pay Now",
         url=url,
@@ -258,7 +258,7 @@ async def handle_pay_flow_select(
     }
 
     await send_list_message(
-        phone=phone,
+        to=phone,
         header="Select Period to Pay",
         body="Choose one or more periods to pay for:",
         button_text="Select Period",
@@ -355,7 +355,7 @@ async def handle_add_period(
         return
 
     await send_list_message(
-        phone=phone,
+        to=phone,
         header="Select Another Period",
         body="Choose another period to add:",
         button_text="Select Period",
@@ -395,7 +395,7 @@ async def handle_confirm_pay(
     session.flow_data = {}
 
     await send_cta_url_button(
-        phone=phone,
+        to=phone,
         body=f"💳 You're paying *{total_str}* for {len(selected_periods)} period(s).",
         button_text="Pay Now",
         url=url,
