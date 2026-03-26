@@ -2,7 +2,6 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { clearAuthStorage } from "./auth";
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -47,8 +46,13 @@ apiClient.interceptors.response.use(
           : null;
 
       if (!refreshToken) {
-        clearAuthStorage();
-        if (typeof window !== "undefined") window.location.href = "/login";
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("active_coop_id");
+          window.location.href = "/login";
+        }
         return Promise.reject(error);
       }
 
@@ -66,8 +70,13 @@ apiClient.interceptors.response.use(
         original.headers.Authorization = `Bearer ${tokens.access_token}`;
         return apiClient(original);
       } catch {
-        clearAuthStorage();
-        if (typeof window !== "undefined") window.location.href = "/login";
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("active_coop_id");
+          window.location.href = "/login";
+        }
         return Promise.reject(error);
       }
     }

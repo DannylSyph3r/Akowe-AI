@@ -12,11 +12,11 @@ import { Button } from "@/components/ui/Button";
 const FREQUENCY_OPTIONS = [
   { value: "weekly", label: "Weekly" },
   { value: "biweekly", label: "Bi-weekly" },
+  { value: "triweekly", label: "Tri-weekly" },
   { value: "monthly", label: "Monthly" },
   { value: "bimonthly", label: "Bi-monthly" },
   { value: "quarterly", label: "Quarterly" },
-  { value: "biannual", label: "Bi-annual" },
-  { value: "annual", label: "Annual" },
+  { value: "yearly", label: "Yearly" },
 ];
 
 function CopyField({ label, value }: { label: string; value: string }) {

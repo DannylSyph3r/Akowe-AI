@@ -12,12 +12,8 @@ export function TopBar() {
   const { activeCoop } = useCoop();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      router.push("/login");
-    } catch {
-      toast.error("Failed to log out");
-    }
+    await logout();
+    router.push("/login");
   };
 
   return (
