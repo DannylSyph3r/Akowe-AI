@@ -5,6 +5,7 @@ from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contribution import Contribution
+from app.models.contribution_period import ContributionPeriod
 from app.models.cooperative import Cooperative
 from app.models.pending_transaction import PendingTransaction
 
@@ -77,8 +78,15 @@ class PaymentRepository:
     async def mark_contributions_paid(
         self, period_ids: list[UUID], member_id: UUID
     ) -> None:
-        """Atomically mark all contributions for the given periods as paid."""
+        """
+        Mark contribution records for the given periods as paid.
+        If a record does not yet exist for a period (e.g. the member joined before
+        the period was lazily created, or a future period payment), insert it as
+        paid directly so the balance and history queries reflect the payment.
+        """
         now = datetime.now(timezone.utc)
+
+        # Update any existing contribution records first
         await self.db.execute(
             update(Contribution)
             .where(
@@ -89,6 +97,42 @@ class PaymentRepository:
             )
             .values(status="paid", paid_at=now)
         )
+
+        # Find which period_ids had no contribution record
+        existing_result = await self.db.execute(
+            select(Contribution.period_id).where(
+                and_(
+                    Contribution.member_id == member_id,
+                    Contribution.period_id.in_(period_ids),
+                )
+            )
+        )
+        existing_ids = {row[0] for row in existing_result.all()}
+        missing_ids = [pid for pid in period_ids if pid not in existing_ids]
+
+        if not missing_ids:
+            return
+
+        # For missing records, fetch the period + coop to get the correct amount,
+        # then insert them directly as paid
+        period_result = await self.db.execute(
+            select(ContributionPeriod, Cooperative)
+            .join(Cooperative, Cooperative.id == ContributionPeriod.cooperative_id)
+            .where(ContributionPeriod.id.in_(missing_ids))
+        )
+        for period, coop in period_result.all():
+            self.db.add(
+                Contribution(
+                    member_id=member_id,
+                    cooperative_id=coop.id,
+                    period_id=period.id,
+                    amount=coop.contribution_amount,
+                    status="paid",
+                    paid_at=now,
+                )
+            )
+
+        await self.db.flush()
 
     async def increment_pool_balance(self, coop_id: UUID, amount: int) -> None:
         """Atomically increment the cooperative's pool balance."""
