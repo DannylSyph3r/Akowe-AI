@@ -251,15 +251,16 @@ async def handle_broadcast_flow(
             return
 
         coop_repo = CooperativeRepository(db)
-        member_count = await coop_repo.get_member_count(coop_id)
+        total_count = await coop_repo.get_member_count(coop_id)
+        recipient_count = max(0, total_count - 1)
         session.flow_data["broadcast_message"] = message_text
         session.current_step = 2
 
         await send_reply_buttons(
             phone,
-            f"Ready to send this message to *{member_count} members*:\n\n_{message_text}_",
+            f"Ready to send this message to *{recipient_count} members*:\n\n_{message_text}_",
             [
-                {"id": "confirm_broadcast", "title": f"✅ Send to {member_count}"},
+                {"id": "confirm_broadcast", "title": f"✅ Send to {recipient_count}"},
                 {"id": "cancel", "title": "❌ Cancel"},
             ],
         )
