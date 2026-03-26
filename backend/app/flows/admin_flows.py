@@ -20,6 +20,7 @@ from app.services.gemini_service import GeminiProClient
 from app.services.whatsapp_service import (
     TEMPLATE_BROADCAST,
     TEMPLATE_CONTRIBUTION_REMINDER,
+    sanitize_template_param,
     send_list_message,
     send_reply_buttons,
     send_template_message,
@@ -279,6 +280,8 @@ async def handle_broadcast_flow(
 
         sent_count = 0
         for member_phone, member_name in member_phones:
+            if member_phone == phone:
+                continue
             try:
                 await send_template_message(
                     to=member_phone,
@@ -287,8 +290,8 @@ async def handle_broadcast_flow(
                         {
                             "type": "body",
                             "parameters": [
-                                {"type": "text", "text": coop_name},
-                                {"type": "text", "text": message_text},
+                                {"type": "text", "text": sanitize_template_param(coop_name)},
+                                {"type": "text", "text": sanitize_template_param(message_text)},
                             ],
                         }
                     ],

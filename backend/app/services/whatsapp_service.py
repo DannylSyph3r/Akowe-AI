@@ -1,4 +1,5 @@
 import logging
+import re
 
 import httpx
 
@@ -11,6 +12,18 @@ TEMPLATE_PAYMENT_RECEIPT = "payment_receipt"
 TEMPLATE_WITHDRAWAL_ALERT = "coop_withdrawal_alert"
 TEMPLATE_CONTRIBUTION_REMINDER = "coop_contribution_reminder"
 TEMPLATE_BROADCAST = "coop_broadcast_message"
+
+
+def sanitize_template_param(text: str) -> str:
+    """Strip characters forbidden in WhatsApp template parameters.
+
+    Meta rejects params that contain newlines, tabs, or 4+ consecutive spaces
+    (error #132018). Replace newlines/tabs with a single space, then collapse
+    runs of 4+ spaces down to 3.
+    """
+    text = re.sub(r"[\n\r\t]+", " ", text)
+    text = re.sub(r" {4,}", "   ", text)
+    return text.strip()
 
 _GRAPH_URL = "https://graph.facebook.com/v18.0"
 
