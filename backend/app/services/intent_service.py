@@ -1,4 +1,5 @@
 import logging
+from typing import TYPE_CHECKING
 
 from app.core.enums import ConversationFlow, Intent
 from app.models.conversation_session import ConversationSession
@@ -27,14 +28,23 @@ BUTTON_INTENT_MAP: dict[str, Intent] = {
     "cancel": Intent.CANCEL,
 }
 
-# Blocking flows capture all free text — the user must complete the flow
+# Blocking flows redirect all free text back into the flow
 _BLOCKING_FLOWS = {
     ConversationFlow.REGISTER.value,
     ConversationFlow.BROADCAST.value,
     ConversationFlow.MEMBER_LOOKUP.value,
 }
 
-_gemini_flash = GeminiFlashClient()
+# Lazy singleton — only created on first use, never at import time
+_gemini_flash: GeminiFlashClient | None = None
+
+
+def _get_flash_client() -> GeminiFlashClient:
+    """Return the shared GeminiFlashClient, creating it on first call."""
+    global _gemini_flash
+    if _gemini_flash is None:
+        _gemini_flash = GeminiFlashClient()
+    return _gemini_flash
 
 
 def classify_button_intent(button_payload: str) -> Intent:
@@ -45,12 +55,14 @@ async def classify_text_intent(
     text: str, member_role: str
 ) -> tuple[Intent, dict]:
     """
-    Use Gemini Flash to classify free text. Returns (Intent, entities dict).
-    Falls back to UNKNOWN on any parse failure.
+    Use Gemini Flash to classify free text.
+    Returns (Intent, entities dict). Falls back to UNKNOWN on any failure.
     """
     prompt = f"User role: {member_role}\nUser message: {text}"
     try:
-        result = await _gemini_flash.classify_intent(prompt, INTENT_CLASSIFICATION_PROMPT)
+        result = await _get_flash_client().classify_intent(
+            prompt, INTENT_CLASSIFICATION_PROMPT
+        )
         intent_str = result.get("intent", "UNKNOWN")
         entities = result.get("entities", {})
         try:
@@ -72,8 +84,12 @@ async def route_message(
 
     Priority:
     1. Button reply → direct lookup in BUTTON_INTENT_MAP
-    2. List selection → check for coop switcher prefix, else BUTTON_INTENT_MAP
-    3. Text + active blocking flow → return flow intent (user is mid-flow)
+    2. List selection:
+       - Cooperative switcher prefix → SWITCH_COOP
+       - Active PAY_SELECTION flow + period row → PAY with row_id entity
+       - Active MEMBER_LOOKUP flow + lookup row → MEMBER_LOOKUP with row_id entity
+       - Otherwise → BUTTON_INTENT_MAP lookup (menu list items)
+    3. Text + active blocking flow → return flow intent without LLM
     4. Free text → Gemini Flash classification
     """
     message_type = message_data.get("message_type")
@@ -85,18 +101,31 @@ async def route_message(
 
     if message_type == "list":
         row_id = message_data.get("list_payload", "")
-        # Cooperative switcher rows are prefixed with "switch_coop_"
+
         if row_id.startswith("switch_coop_"):
             coop_id_str = row_id.removeprefix("switch_coop_")
             return Intent.SWITCH_COOP, {"coop_id": coop_id_str}
-        # Otherwise treat as a standard button intent (same IDs for menu items)
-        intent = classify_button_intent(row_id)
-        return intent, {}
+
+        # Flow-aware list routing — period selection
+        if session.current_flow == ConversationFlow.PAY_SELECTION.value and (
+            row_id.startswith("period_") or row_id.startswith("future_")
+        ):
+            return Intent.PAY, {"row_id": row_id}
+
+        # Flow-aware list routing — member lookup result selection
+        if (
+            session.current_flow == ConversationFlow.MEMBER_LOOKUP.value
+            and row_id.startswith("lookup_")
+        ):
+            return Intent.MEMBER_LOOKUP, {"row_id": row_id}
+
+        # Standard menu list items (same IDs as buttons)
+        return classify_button_intent(row_id), {}
 
     if message_type == "text":
         text = message_data.get("text", "")
 
-        # Active blocking flow: redirect text back to the flow without LLM
+        # Active blocking flow: redirect text back into the flow without LLM
         if session.current_flow in _BLOCKING_FLOWS:
             try:
                 return Intent(session.current_flow), {}
@@ -116,7 +145,8 @@ async def send_fallback_menu(phone: str, role: str) -> None:
         "I didn't quite catch that. Here's what I can help with 👇",
     )
     if role == "exco":
-        await send_list_message_exco_menu(phone)
+        from app.flows.dispatch import send_exco_main_menu
+        await send_exco_main_menu(phone, "")
     else:
         await send_reply_buttons(
             phone,
@@ -126,9 +156,3 @@ async def send_fallback_menu(phone: str, role: str) -> None:
                 {"id": "my_balance", "title": "📊 My Balance"},
             ],
         )
-
-
-async def send_list_message_exco_menu(phone: str) -> None:
-    """Helper to avoid circular import — sends exco menu as a list."""
-    from app.flows.dispatch import send_exco_main_menu
-    await send_exco_main_menu(phone, "")
