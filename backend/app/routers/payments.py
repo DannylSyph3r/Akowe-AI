@@ -198,7 +198,7 @@ async def payment_initiate(
         txn_ref=reference,
         amount=transaction.amount,
         cust_name=cust_name,
-        redirect_url=f"{settings.railway_backend_url}/api/payments/redirect",
+        redirect_url=f"{settings.prod_url}/api/payments/redirect",
     )
     return HTMLResponse(content=html)
 
