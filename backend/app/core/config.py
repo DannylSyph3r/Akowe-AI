@@ -22,11 +22,9 @@ class Settings(BaseSettings):
     # Interswitch
     interswitch_merchant_code: str = ""
     interswitch_pay_item_id: str = ""
-    interswitch_secret_key: str = ""  # OAuth2 client secret AND webhook HMAC key
-    interswitch_client_id: str = ""
-    interswitch_auth_url: str = "https://passport.k8.isw.la/passport/oauth/token?grant_type=client_credentials"
+    interswitch_webhook_secret: str = ""  # Webhook HMAC-SHA512 signing key
     interswitch_base_url: str = "https://newwebpay.qa.interswitchng.com"
-    interswitch_query_url: str = "https://qa.interswitchng.com/collections/api/v2/gettransaction.json"
+    interswitch_query_url: str = "https://qa.interswitchng.com/collections/api/v1/gettransaction.json"
 
     # AI
     gemini_api_key: str = ""
