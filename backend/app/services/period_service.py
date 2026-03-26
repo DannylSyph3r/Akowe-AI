@@ -193,24 +193,32 @@ class PeriodService:
                 "is_future": False,
             })
 
-        # --- Current open period ---
+        # --- Current open period (only if member has not already paid for it) ---
         open_period = await self.period_repo.get_open_period(coop_id)
         if open_period:
-            end_date = compute_period_end_date(
-                schedule.anchor_date, freq, open_period.period_number
+            paid_check = await self.db.execute(
+                select(Contribution.id).where(
+                    Contribution.member_id == member_id,
+                    Contribution.period_id == open_period.id,
+                    Contribution.status == "paid",
+                )
             )
-            result.append({
-                "id": open_period.id,
-                "period_number": open_period.period_number,
-                "start_date": open_period.start_date,
-                "due_date": open_period.due_date,
-                "amount": coop.contribution_amount,
-                "label": format_period_label(
-                    open_period.period_number, open_period.start_date, end_date
-                ),
-                "is_debt": False,
-                "is_future": False,
-            })
+            if paid_check.scalar_one_or_none() is None:
+                end_date = compute_period_end_date(
+                    schedule.anchor_date, freq, open_period.period_number
+                )
+                result.append({
+                    "id": open_period.id,
+                    "period_number": open_period.period_number,
+                    "start_date": open_period.start_date,
+                    "due_date": open_period.due_date,
+                    "amount": coop.contribution_amount,
+                    "label": format_period_label(
+                        open_period.period_number, open_period.start_date, end_date
+                    ),
+                    "is_debt": False,
+                    "is_future": False,
+                })
 
         # --- Up to 3 future periods (computed, not persisted) ---
         latest_number = await self.period_repo.get_latest_period_number(coop_id)
