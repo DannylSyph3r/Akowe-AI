@@ -79,4 +79,5 @@ class Intent(str, Enum):
     SHOW_MORE = "SHOW_MORE"
     SWITCH_COOP = "SWITCH_COOP"
     CANCEL = "CANCEL"
+    GREETING = "GREETING"
     UNKNOWN = "UNKNOWN"

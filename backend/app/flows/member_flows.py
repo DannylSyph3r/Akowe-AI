@@ -236,7 +236,7 @@ async def handle_pay_flow_select(
         if isinstance(start, str):
             from datetime import datetime
             start = datetime.fromisoformat(start).date()
-        short_title = start.strftime("%b %Y") if start else f"Period {p['period_number']}"
+        short_title = start.strftime("%d %b %Y") if start else f"Period {p['period_number']}"
 
         if p.get("is_debt"):
             description = f"⚠️ Overdue · {amount_str}"
@@ -350,17 +350,17 @@ async def handle_add_period(
         label = p.get("label", f"Period {p.get('period_number')}")
         amount_str = _format_naira(p["amount"])
         if p.get("is_debt"):
-            description = f"⚠️ Overdue — {amount_str}"
+            description = f"⚠️ Overdue · {amount_str}"
         elif p.get("is_future"):
-            description = f"🔮 Future — {amount_str}"
+            description = f"🔮 Future · {amount_str}"
         else:
-            description = amount_str
+            description = f"{label[:20]} · {amount_str}" if len(label) > 20 else f"{label} · {amount_str}"
         from datetime import date as _date
         start = p.get("start_date")
         if isinstance(start, str):
             from datetime import datetime
             start = datetime.fromisoformat(start).date()
-        short_title = start.strftime("%b %Y") if start else f"Period {p.get('period_number')}"
+        short_title = start.strftime("%d %b %Y") if start else f"Period {p.get('period_number')}"
         rows.append({"id": row_id, "title": short_title, "description": description})
 
     if not rows:

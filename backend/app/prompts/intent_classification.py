@@ -14,6 +14,7 @@ Your job is to classify a user's message into one of the following intents and e
 - COOP_SUMMARY — Exco wants an AI-generated financial summary of the cooperative
 - BROADCAST — Exco wants to send a broadcast message to all members
 - MEMBER_LOOKUP — Exco wants to look up a specific member's details
+- GREETING — User is saying hello, thanks, or making casual conversation with no specific task intent
 - UNKNOWN — The message does not match any known intent
 
 ## ENTITIES
@@ -67,10 +68,19 @@ User (exco): "Look up Chidi Okafor"
 {"intent": "MEMBER_LOOKUP", "entities": {"member_name": "Chidi Okafor"}}
 
 User (member): "Hello"
-{"intent": "UNKNOWN", "entities": {}}
+{"intent": "GREETING", "entities": {}}
+
+User (member): "Hi"
+{"intent": "GREETING", "entities": {}}
+
+User (member): "Hey"
+{"intent": "GREETING", "entities": {}}
 
 User (member): "Thanks"
-{"intent": "UNKNOWN", "entities": {}}
+{"intent": "GREETING", "entities": {}}
+
+User (member): "Good morning"
+{"intent": "GREETING", "entities": {}}
 
 Now classify the following message.
 """
