@@ -159,8 +159,9 @@ class WithdrawalListItem(BaseModel):
 
 class PaginatedWithdrawals(BaseModel):
     items: list[WithdrawalListItem]
+    total: int
     page: int
-    page_size: int
+    has_more: bool
 
 
 class InsightResponse(BaseModel):

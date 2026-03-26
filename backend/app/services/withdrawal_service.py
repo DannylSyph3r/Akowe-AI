@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestException, NotFoundException
@@ -166,12 +166,21 @@ class WithdrawalService:
         coop_id: UUID,
         page: int,
         page_size: int,
-    ) -> list[dict]:
+    ) -> dict:
         """
         Return paginated withdrawal log for a cooperative, newest first.
         Joins the authorized member's name for display.
+        Returns total count and has_more flag per D33.
         """
         offset = (page - 1) * page_size
+
+        # Total count — separate query, cheap on indexed FK column
+        count_result = await self.db.execute(
+            select(func.count(Withdrawal.id)).where(
+                Withdrawal.cooperative_id == coop_id
+            )
+        )
+        total = count_result.scalar_one()
 
         result = await self.db.execute(
             select(
@@ -189,7 +198,7 @@ class WithdrawalService:
             .limit(page_size)
         )
 
-        return [
+        items = [
             {
                 "id": row.id,
                 "amount": row.amount,
@@ -200,3 +209,10 @@ class WithdrawalService:
             }
             for row in result.all()
         ]
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "has_more": total > page * page_size,
+        }

@@ -228,12 +228,13 @@ async def list_withdrawals(
     _membership=Depends(get_coop_membership),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
-    items = await WithdrawalService(db).get_withdrawals(coop_id, page, page_size)
+    result = await WithdrawalService(db).get_withdrawals(coop_id, page, page_size)
     return ApiResponse.success(
         data=PaginatedWithdrawals(
-            items=[WithdrawalListItem(**item) for item in items],
-            page=page,
-            page_size=page_size,
+            items=[WithdrawalListItem(**item) for item in result["items"]],
+            total=result["total"],
+            page=result["page"],
+            has_more=result["has_more"],
         ),
         message="OK",
     )
