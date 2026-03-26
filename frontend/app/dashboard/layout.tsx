@@ -19,7 +19,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    if (!isLoading && allCoops.length === 0 && pathname !== "/dashboard/setup") {
+    if (
+      !isLoading &&
+      allCoops.length === 0 &&
+      !!getAccessToken() &&
+      pathname !== "/dashboard/setup"
+    ) {
       router.replace("/dashboard/setup");
     }
   }, [isLoading, allCoops, router, pathname]);
