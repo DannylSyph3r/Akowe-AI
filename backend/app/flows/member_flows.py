@@ -25,6 +25,26 @@ def _format_naira(amount_kobo: int) -> str:
     return f"₦{amount_kobo / 100:,.0f}"
 
 
+def _serialize_period_for_session(p: dict) -> dict:
+    """
+    Convert a period dict to JSON-safe form for storage in session flow_data.
+    UUID and date objects are not JSON-serializable — convert them to strings.
+    """
+    from datetime import date
+    import uuid as _uuid
+
+    serialized = dict(p)
+    # UUID → str
+    if serialized.get("id") is not None:
+        serialized["id"] = str(serialized["id"])
+    # date → ISO string
+    for key in ("start_date", "due_date"):
+        val = serialized.get(key)
+        if isinstance(val, date):
+            serialized[key] = val.isoformat()
+    return serialized
+
+
 # Registration flow
 async def handle_register_flow(
     phone: str,
@@ -110,21 +130,19 @@ async def _register_whatsapp_member(
     db: AsyncSession,
 ) -> dict:
     """
-    Validate join code, then get-or-create member, then join coop.
+    Validate join code, get-or-create member, then join coop.
     Member creation only happens AFTER code validation succeeds.
+    join_cooperative() handles its own commit — no second commit needed here.
     """
+    from app.repositories.join_code_repository import JoinCodeRepository
+
     # 1. Pre-validate the code without consuming it
     join_svc = JoinCodeService(db)
-    # validate_and_redeem_join_code will raise if the code is invalid
-    # We use join_cooperative which does validate → check existing → redeem → create membership
-    # But we need the member to exist first. So we validate manually then create member.
-
-    from app.repositories.join_code_repository import JoinCodeRepository
     code_repo = JoinCodeRepository(db)
     jc = await code_repo.get_by_code(join_code)
     join_svc._validate_code(jc)  # raises BadRequestException if invalid
 
-    # 2. Get or create member record
+    # 2. Get or create the member record (only after code is confirmed valid)
     member_repo = MemberRepository(db)
     member = await member_repo.get_by_phone(phone)
     if member is None:
@@ -135,10 +153,9 @@ async def _register_whatsapp_member(
         )
         await db.flush()
 
-    # 3. Join the cooperative (handles redemption, coop_member creation, first contribution)
-    result = await join_svc.join_cooperative(join_code, member.id)
-    await db.commit()
-    return result
+    # 3. Join cooperative — validates again, redeems code, creates CoopMember
+    #    and first Contribution record, then commits internally
+    return await join_svc.join_cooperative(join_code, member.id)
 
 
 # Payment flows
@@ -214,20 +231,23 @@ async def handle_pay_flow_select(
     for p in periods:
         label = p.get("label", f"Period {p['period_number']}")
         amount_str = _format_naira(p["amount"])
-        description = f"{amount_str}"
+
         if p.get("is_debt"):
             description = f"⚠️ Overdue — {amount_str}"
         elif p.get("is_future"):
             description = f"🔮 Future — {amount_str}"
+        else:
+            description = amount_str
 
-        # Row ID: use period ID for existing, or future_{period_number} for future
+        # Row ID uses the period's DB id or a future placeholder
         if p.get("id"):
             row_id = f"period_{p['id']}"
         else:
             row_id = f"future_{p['period_number']}"
 
         rows.append({"id": row_id, "title": label, "description": description})
-        period_options[row_id] = p
+        # Serialize before storing in JSONB flow_data (UUIDs and dates → strings)
+        period_options[row_id] = _serialize_period_for_session(p)
 
     session.current_flow = "PAY_SELECTION"
     session.current_step = 1
@@ -292,6 +312,55 @@ async def handle_pay_period_selected(
             {"id": "add_period", "title": "➕ Add Another Period"},
             {"id": "confirm_pay", "title": f"💳 Pay {total_str}"},
         ],
+    )
+
+
+async def handle_add_period(
+    phone: str,
+    session: ConversationSession,
+    db: AsyncSession,
+) -> None:
+    """
+    Re-show the period selection list with already-selected periods removed.
+    Called when user taps 'Add Another Period' during PAY_SELECTION flow.
+    """
+    period_options: dict = session.flow_data.get("period_options", {})
+    selected_periods: list = session.flow_data.get("selected_periods", [])
+
+    # Build the set of already-selected period keys
+    selected_keys = set()
+    for p in selected_periods:
+        key = p.get("id") or f"future_{p.get('period_number')}"
+        if key:
+            selected_keys.add(str(key))
+
+    rows = []
+    for row_id, p in period_options.items():
+        # Derive the comparable key from the stored (serialized) period
+        period_key = p.get("id") or f"future_{p.get('period_number')}"
+        if str(period_key) in selected_keys:
+            continue  # Already selected
+
+        label = p.get("label", f"Period {p.get('period_number')}")
+        amount_str = _format_naira(p["amount"])
+        if p.get("is_debt"):
+            description = f"⚠️ Overdue — {amount_str}"
+        elif p.get("is_future"):
+            description = f"🔮 Future — {amount_str}"
+        else:
+            description = amount_str
+        rows.append({"id": row_id, "title": label, "description": description})
+
+    if not rows:
+        await send_text_message(phone, "No more periods available to add.")
+        return
+
+    await send_list_message(
+        phone=phone,
+        header="Select Another Period",
+        body="Choose another period to add:",
+        button_text="Select Period",
+        sections=[{"title": "Payable Periods", "rows": rows[:10]}],
     )
 
 
@@ -379,7 +448,11 @@ async def handle_history_intent(
     coop_id: UUID,
     page: int,
     db: AsyncSession,
-) -> None:
+) -> bool:
+    """
+    Fetch and display paginated contribution history.
+    Returns True if more pages exist (so caller can update session page pointer).
+    """
     contrib_svc = ContributionService(db)
     result = await contrib_svc.get_member_history(
         member_id=member.id,
@@ -391,7 +464,7 @@ async def handle_history_intent(
     items = result.get("items", [])
     if not items and page == 0:
         await send_text_message(phone, "You have no payment history yet.")
-        return
+        return False
 
     lines = [f"📜 *Payment History* (page {page + 1})\n"]
     for item in items:
@@ -404,14 +477,11 @@ async def handle_history_intent(
 
     await send_text_message(phone, "\n".join(lines))
 
-    if result.get("has_more"):
-        # Save page number for the "Show More" button
-        from app.services.session_service import save_session
-        from sqlalchemy.ext.asyncio import AsyncSession
-        # We don't have the session here; we'll track page via flow_data
-        # The caller should update session.flow_data["history_page"] = page + 1
+    has_more = result.get("has_more", False)
+    if has_more:
         await send_reply_buttons(
             phone,
             "There are more entries.",
             [{"id": "show_more_history", "title": "📄 Show More"}],
         )
+    return has_more
