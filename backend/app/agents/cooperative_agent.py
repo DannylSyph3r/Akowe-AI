@@ -51,7 +51,7 @@ def create_cooperative_agent(coop_id: UUID) -> LlmAgent:
     """
     return LlmAgent(
         name="cooperative_advisor",
-        model="gemini-3.1-pro-preview",
+        model="gemini-3-flash-preview",
         instruction=format_chatbot_prompt(str(coop_id)),
         tools=[query_cooperative_data],
     )
