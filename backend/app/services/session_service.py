@@ -13,32 +13,39 @@ _SESSION_EXPIRY_MINUTES = 30
 
 async def load_or_create_session(
     phone: str, db: AsyncSession
-) -> ConversationSession:
+) -> tuple[ConversationSession, bool]:
     """
-    Load the existing session for this phone number, or create a new one.
-    If the session has an active flow but has been idle for >30 minutes,
-    the flow state is reset (session expired).
+    Load the existing session or create a new one.
+
+    Returns:
+        (session, was_expired) — was_expired is True if the session had an active
+        flow that was reset due to 30-minute inactivity. The caller should notify
+        the user before processing their current message.
     """
     repo = SessionRepository(db)
     session = await repo.get_by_phone(phone)
 
     if session is None:
         session = await repo.create(phone)
-        return session
+        return session, False
 
-    # Check for session expiry
+    was_expired = False
     if session.current_flow is not None:
         expiry_threshold = datetime.now(timezone.utc) - timedelta(
             minutes=_SESSION_EXPIRY_MINUTES
         )
         if session.last_active < expiry_threshold:
-            logger.debug("Session expired for phone=%s, resetting flow state", phone)
+            logger.debug(
+                "Session expired for phone=%s, flow=%s, resetting",
+                phone,
+                session.current_flow,
+            )
+            was_expired = True
             session.current_flow = None
             session.current_step = 0
             session.flow_data = {}
-            # The caller (webhook handler) is responsible for saving the session
 
-    return session
+    return session, was_expired
 
 
 async def save_session(session: ConversationSession, db: AsyncSession) -> None:
