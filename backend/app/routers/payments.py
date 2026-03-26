@@ -1,3 +1,4 @@
+import json
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -161,7 +162,6 @@ async def _send_payment_failure_message(transaction) -> None:
         member_repo = MemberRepository(db)
         member = await member_repo.get_by_id(transaction.member_id)
         if member:
-            retry_url = f"{settings.railway_backend_url}/api/payments/retry-page/{transaction.reference}"
             await send_text_message(
                 member.phone_number,
                 f"⚠️ We could not confirm your payment (ref: {transaction.reference}).\n\n"
@@ -246,7 +246,7 @@ async def payment_webhook(
         return ApiResponse.success(data=None, message="ok")
 
     try:
-        payload = __import__("json").loads(raw_body)
+        payload = json.loads(raw_body)
     except Exception:
         return ApiResponse.success(data=None, message="ok")
 

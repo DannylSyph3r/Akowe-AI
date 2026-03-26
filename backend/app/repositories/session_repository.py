@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select, update
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conversation_session import ConversationSession
@@ -32,7 +31,7 @@ class SessionRepository:
         return session
 
     async def save(self, session: ConversationSession) -> None:
-        """Upsert session state and update last_active timestamp."""
+        """Update session state and refresh last_active timestamp."""
         now = datetime.now(timezone.utc)
         await self.db.execute(
             update(ConversationSession)

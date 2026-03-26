@@ -110,7 +110,11 @@ class PaymentService:
         return transaction
 
     def build_payment_initiation_url(self, reference: str) -> str:
-        return f"{settings.prod_url}/api/payments/initiate/{reference}" 
+        """
+        Returns the URL for the WhatsApp CTA button.
+        Points to our bridge page which auto-submits the form to Interswitch.
+        """
+        return f"{settings.prod_url}/api/payments/initiate/{reference}"
 
     async def poll_transaction_status(
         self, reference: str, amount_kobo: int
