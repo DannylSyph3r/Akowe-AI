@@ -14,7 +14,7 @@ from app.core.exceptions import BadRequestException, NotFoundException
 from app.models.pending_transaction import PendingTransaction
 from app.repositories.payment_repository import PaymentRepository
 from app.services.period_service import PeriodService
-from app.services.reminder_service import cancel_reminders_for_periods
+from app.services.reminder_service import ReminderService
 
 settings = get_settings()
 logger = logging.getLogger("akoweai")
@@ -146,7 +146,7 @@ class PaymentService:
     async def is_transaction_already_processed(self, reference: str) -> bool:
         return await self.payment_repo.is_already_paid(reference)
 
-    async def process_successful_payment(
+async def process_successful_payment(
         self, transaction: PendingTransaction
     ) -> None:
         """
@@ -154,7 +154,7 @@ class PaymentService:
         1. Mark PendingTransaction as paid
         2. Mark all covered Contribution records as paid
         3. Increment cooperative pool balance
-        4. Cancel pending reminders (stub until Phase 8)
+        4. Cancel pending reminders for affected member + periods
         """
         await self.payment_repo.mark_paid(transaction.id)
         await self.payment_repo.mark_contributions_paid(
@@ -163,8 +163,8 @@ class PaymentService:
         await self.payment_repo.increment_pool_balance(
             transaction.cooperative_id, transaction.amount
         )
-        await cancel_reminders_for_periods(
-            transaction.period_ids, transaction.member_id, self.db
+        await ReminderService(self.db).cancel_reminders_for_periods(
+            transaction.period_ids, transaction.member_id
         )
 
 
