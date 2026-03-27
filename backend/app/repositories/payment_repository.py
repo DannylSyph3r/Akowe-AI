@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import and_, select, update
-from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contribution import Contribution

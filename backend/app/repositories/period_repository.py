@@ -45,6 +45,12 @@ class PeriodRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, period_id: UUID) -> ContributionPeriod | None:
+        result = await self.db.execute(
+            select(ContributionPeriod).where(ContributionPeriod.id == period_id)
+        )
+        return result.scalar_one_or_none()
+
     async def create(
         self,
         coop_id: UUID,

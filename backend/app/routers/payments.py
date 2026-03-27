@@ -143,20 +143,32 @@ async def _send_payment_receipt(transaction) -> None:
     async with AsyncSessionFactory() as db:
         member_repo = MemberRepository(db)
         member = await member_repo.get_by_id(transaction.member_id)
-        if member:
-            from app.repositories.cooperative_repository import CooperativeRepository
-            coop = await CooperativeRepository(db).get_by_id(transaction.cooperative_id)
-            coop_name = coop.name if coop else "your cooperative"
-            
-            period_label = "Multiple Periods" if len(transaction.period_ids) > 1 else "Current Period"
+        if not member:
+            return
 
-            await dispatch_payment_receipt(
-                phone=member.phone_number,
-                transaction=transaction,
-                coop_name=coop_name,
-                member_name=member.full_name,
-                period_label=period_label
+        from app.repositories.cooperative_repository import CooperativeRepository
+        from app.repositories.period_repository import PeriodRepository
+
+        coop = await CooperativeRepository(db).get_by_id(transaction.cooperative_id)
+        coop_name = coop.name if coop else "your cooperative"
+
+        if len(transaction.period_ids) > 1:
+            period_label = "Multiple Periods"
+        elif len(transaction.period_ids) == 1:
+            period = await PeriodRepository(db).get_by_id(transaction.period_ids[0])
+            period_label = (
+                period.start_date.strftime("%B %Y") if period else "Current Period"
             )
+        else:
+            period_label = "Current Period"
+
+        await dispatch_payment_receipt(
+            phone=member.phone_number,
+            transaction=transaction,
+            coop_name=coop_name,
+            member_name=member.full_name,
+            period_label=period_label,
+        )
 
 
 async def _send_payment_failure_message(transaction) -> None:
