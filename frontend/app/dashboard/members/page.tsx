@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useCoop } from "@/context/CoopContext";
-import { getMembers, generateJoinCodes } from "@/lib/api/cooperatives";
+import {
+  getMembers,
+  generateJoinCodes,
+  getActiveJoinCodes,
+  revokeJoinCode,
+} from "@/lib/api/cooperatives";
 import { formatNaira, formatDate } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -36,20 +41,27 @@ function CopyButton({ text }: { text: string }) {
 export default function MembersPage() {
   const { activeCoop } = useCoop();
   const coopId = activeCoop?.id ?? "";
+  const queryClient = useQueryClient();
 
-  const { data: members = [], isLoading } = useQuery({
+  const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["coop", coopId, "members"],
     queryFn: () => getMembers(coopId),
     enabled: !!coopId,
   });
 
+  const { data: joinCodesData, isLoading: codesLoading } = useQuery({
+    queryKey: ["coop", coopId, "join-codes"],
+    queryFn: () => getActiveJoinCodes(coopId),
+    enabled: !!coopId,
+  });
+
+  const activeCodes = joinCodesData?.codes ?? [];
+
   const [search, setSearch] = useState("");
   const [count, setCount] = useState("5");
   const [expiry, setExpiry] = useState("30");
   const [generating, setGenerating] = useState(false);
-  const [codes, setCodes] = useState<
-    Array<{ code: string; expires_at: string }>
-  >([]);
+  const [revokingCode, setRevokingCode] = useState<string | null>(null);
 
   const filtered = members.filter((m) =>
     m.full_name.toLowerCase().includes(search.toLowerCase()),
@@ -58,13 +70,15 @@ export default function MembersPage() {
   const handleGenerateCodes = async () => {
     setGenerating(true);
     try {
-      const result = await generateJoinCodes(
+      await generateJoinCodes(
         coopId,
         parseInt(count, 10),
         parseInt(expiry, 10),
       );
-      setCodes(result.codes);
-      toast.success(`${result.codes.length} join code(s) generated`);
+      await queryClient.invalidateQueries({
+        queryKey: ["coop", coopId, "join-codes"],
+      });
+      toast.success(`${count} join code(s) generated`);
     } catch {
       toast.error("Failed to generate join codes");
     } finally {
@@ -72,10 +86,26 @@ export default function MembersPage() {
     }
   };
 
+  const handleRevoke = async (code: string) => {
+    setRevokingCode(code);
+    try {
+      await revokeJoinCode(coopId, code);
+      await queryClient.invalidateQueries({
+        queryKey: ["coop", coopId, "join-codes"],
+      });
+      toast.success("Join code revoked");
+    } catch {
+      toast.error("Failed to revoke join code");
+    } finally {
+      setRevokingCode(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-foreground">Members</h1>
 
+      {/* Member table */}
       <div className="bg-white rounded-xl border border-border overflow-hidden">
         <div className="p-4 border-b border-border">
           <Input
@@ -109,60 +139,62 @@ export default function MembersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {isLoading
-                ? Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i}>
-                      {Array.from({ length: 6 }).map((_, j) => (
-                        <td key={j} className="px-4 py-3">
-                          <Skeleton className="h-4 w-24" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                : filtered.map((m) => (
-                    <tr
-                      key={m.member_id}
-                      className="hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {m.full_name}
+              {membersLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <Skeleton className="h-4 w-24" />
                       </td>
-                      <td className="px-4 py-3 capitalize text-muted-foreground">
-                        {m.role}
-                      </td>
-                      <td className="px-4 py-3 text-foreground">
-                        {formatNaira(m.total_contributed)}
-                      </td>
-                      <td className="px-4 py-3 text-foreground">
-                        {m.periods_paid}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatDate(m.last_paid_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <RiskBadge level={m.risk_level} />
-                      </td>
-                    </tr>
-                  ))}
-              {!isLoading && filtered.length === 0 && (
+                    ))}
+                  </tr>
+                ))
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-8 text-center text-muted-foreground text-sm"
+                    className="px-4 py-8 text-center text-sm text-muted-foreground"
                   >
                     No members found.
                   </td>
                 </tr>
+              ) : (
+                filtered.map((m) => (
+                  <tr
+                    key={String(m.member_id)}
+                    className="hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      {m.full_name}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground capitalize">
+                      {m.role}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatNaira(m.total_contributed)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {m.periods_paid}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {m.last_paid_at ? formatDate(m.last_paid_at) : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <RiskBadge level={m.risk_level} />
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Join codes panel */}
       <div className="bg-white rounded-xl border border-border p-5 space-y-4">
-        <h2 className="text-base font-medium text-foreground">
-          Generate Join Codes
-        </h2>
+        <h2 className="text-base font-medium text-foreground">Join Codes</h2>
+
+        {/* Generation form */}
         <div className="flex items-end gap-3 flex-wrap">
           <Input
             label="Number of codes"
@@ -187,24 +219,73 @@ export default function MembersPage() {
           </Button>
         </div>
 
-        {codes.length > 0 && (
-          <div className="space-y-1.5 max-h-60 overflow-y-auto scrollbar-thin">
-            {codes.map(({ code, expires_at }) => (
-              <div
-                key={code}
-                className="flex items-center justify-between bg-muted rounded-lg px-3 py-2"
-              >
-                <code className="text-sm font-mono text-foreground">
-                  {code}
-                </code>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    Expires {formatDate(expires_at)}
-                  </span>
-                  <CopyButton text={code} />
-                </div>
-              </div>
+        {/* Active codes table */}
+        {codesLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
             ))}
+          </div>
+        ) : activeCodes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No active join codes. Generate some above.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  {["Code", "Type", "Expires", ""].map((h) => (
+                    <th
+                      key={h}
+                      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {activeCodes.map((jc) => (
+                  <tr
+                    key={jc.code}
+                    className="hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <code className="font-mono text-sm text-foreground">
+                          {jc.code}
+                        </code>
+                        <CopyButton text={jc.code} />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          jc.role === "exco"
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {jc.role === "exco" ? "👑 Exco" : "Member"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                      {formatDate(jc.expires_at)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <button
+                        onClick={() => handleRevoke(jc.code)}
+                        disabled={revokingCode === jc.code}
+                        className="text-xs font-medium text-destructive hover:text-destructive/80 transition-colors disabled:opacity-50"
+                      >
+                        {revokingCode === jc.code ? "Revoking…" : "Revoke"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

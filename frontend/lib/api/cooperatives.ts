@@ -1,5 +1,7 @@
 import apiClient from "./client";
 import type {
+  ActiveJoinCodeItem,
+  ActiveJoinCodesResponse,
   BroadcastResponse,
   ChatResponse,
   ContributionSummaryItem,
@@ -78,6 +80,20 @@ export async function generateExcoInvite(
     expires_in_days: expiresInDays,
   });
   return r.data as ExcoInviteResponse;
+}
+
+export async function getActiveJoinCodes(
+  coopId: string,
+): Promise<ActiveJoinCodesResponse> {
+  const r = await apiClient.get(`/api/cooperatives/${coopId}/join-codes`);
+  return r.data as ActiveJoinCodesResponse;
+}
+
+export async function revokeJoinCode(
+  coopId: string,
+  code: string,
+): Promise<void> {
+  await apiClient.delete(`/api/cooperatives/${coopId}/join-codes/${code}`);
 }
 
 export async function getPeriods(coopId: string): Promise<PeriodListItem[]> {

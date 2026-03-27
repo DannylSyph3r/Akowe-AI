@@ -98,6 +98,17 @@ export interface ExcoInviteResponse {
   expires_at: string;
 }
 
+export interface ActiveJoinCodeItem {
+  code: string;
+  role: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface ActiveJoinCodesResponse {
+  codes: ActiveJoinCodeItem[];
+}
+
 // Contributions
 
 export interface ContributionSummaryItem {
