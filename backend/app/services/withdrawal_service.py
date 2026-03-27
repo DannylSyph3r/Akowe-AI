@@ -1,10 +1,3 @@
-"""
-Withdrawal service — Phase 8.
-
-Handles recording withdrawals against the cooperative pool and
-broadcasting WhatsApp notifications to all members.
-"""
-
 import logging
 from datetime import datetime, timezone
 from uuid import UUID

@@ -1,7 +1,3 @@
-"""
-WhatsApp conversation flows for cooperative executives (exco).
-"""
-
 import logging
 from uuid import UUID
 

@@ -1,5 +1,3 @@
-"""Chatbot service — wraps ADK agent runner for single-turn Q&A."""
-
 import logging
 from uuid import UUID
 

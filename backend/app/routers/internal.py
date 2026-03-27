@@ -1,11 +1,3 @@
-"""
-Internal cron endpoints — Phase 8.
-
-These endpoints are called by Railway cron jobs on a fixed schedule.
-They are NOT mounted under /api and are NOT protected by JWT auth.
-Security is a single shared secret checked via the Authorization header.
-"""
-
 import logging
 
 from fastapi import APIRouter, Depends, Header

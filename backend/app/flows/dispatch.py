@@ -1,5 +1,3 @@
-"""Central dispatcher for WhatsApp conversation flows."""
-
 import logging
 from uuid import UUID
 

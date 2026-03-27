@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /c/slethdev/akoweai/backend/app -name *.py -type f)"
+      "Bash(find /c/slethdev/akoweai/backend/app -name *.py -type f)",
+      "Bash(for file:*)",
+      "Bash(do)",
+      "Bash(echo \"=== $file ===\")",
+      "Read(//c/slethdev/akoweai/**)",
+      "Bash(done)"
     ]
   }
 }

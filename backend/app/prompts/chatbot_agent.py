@@ -1,10 +1,3 @@
-"""
-System prompt for the ADK cooperative advisor chatbot.
-
-The {COOP_ID} placeholder is replaced at agent instantiation time via
-string replacement, scoping all agent-generated queries to one cooperative.
-"""
-
 CHATBOT_AGENT_PROMPT_TEMPLATE = """
 You are a financial advisor for a Nigerian savings cooperative (ajo/esusu) management
 system called AkoweAI. You help cooperative executives understand their cooperative's

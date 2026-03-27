@@ -1,5 +1,3 @@
-"""Reminder service for scheduled contribution reminders."""
-
 import logging
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID

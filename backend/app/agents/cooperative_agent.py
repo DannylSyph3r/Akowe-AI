@@ -1,5 +1,3 @@
-"""Cooperative advisor agent powered by ADK."""
-
 import json
 import logging
 from uuid import UUID
