@@ -38,19 +38,13 @@ class PaymentService:
         period_data: list[dict],
         amount_kobo: int,
     ) -> PendingTransaction:
-        """
-        Create a PendingTransaction record.
-        If any periods are future (id=None), they are persisted first via
-        generate_future_periods before the transaction is created.
-        """
+        """Create a pending transaction, generating future periods if needed."""
         period_ids: list[UUID] = []
 
         future_indices = [i for i, p in enumerate(period_data) if p.get("id") is None]
         future_count = len(future_indices)
 
         if future_count > 0:
-            # generate_future_periods uses find-or-create by period_number,
-            # returning periods in ascending period_number order
             generated = await self.period_service.generate_future_periods(
                 coop_id, future_count
             )
@@ -76,20 +70,13 @@ class PaymentService:
         return transaction
 
     def build_payment_initiation_url(self, reference: str) -> str:
-        """
-        Returns the URL for the WhatsApp CTA button.
-        Points to our bridge page which auto-submits the form to Interswitch.
-        """
+        """Build payment initiation URL for WhatsApp CTA button."""
         return f"{settings.prod_url}/api/payments/initiate/{reference}"
 
     async def poll_transaction_status(
         self, reference: str, amount_kobo: int
     ) -> dict:
-        """
-        Query Interswitch for authoritative transaction status.
-        Uses v1 API — no authentication required.
-        Query params are lowercase per the v1 spec.
-        """
+        """Query Interswitch for transaction status."""
         params = {
             "merchantcode": settings.interswitch_merchant_code,
             "transactionreference": reference,
@@ -107,13 +94,7 @@ class PaymentService:
     async def process_successful_payment(
         self, transaction: PendingTransaction
     ) -> None:
-        """
-        Atomically:
-        1. Mark PendingTransaction as paid
-        2. Mark all covered Contribution records as paid
-        3. Increment cooperative pool balance
-        4. Cancel pending reminders for affected member + periods
-        """
+        """Update transaction and contribution records as paid."""
         await self.payment_repo.mark_paid(transaction.id)
         await self.payment_repo.mark_contributions_paid(
             transaction.period_ids, transaction.member_id

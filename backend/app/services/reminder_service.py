@@ -1,10 +1,4 @@
-"""
-Reminder service — Phase 8.
-
-Replaces the Phase 5 stub. Class-based, consistent with all other services.
-Deviation D20: cancel_reminders_for_periods signature matches existing call
-site in payment_service.py — period_ids first, member_id second.
-"""
+"""Reminder service for scheduled contribution reminders."""
 
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -26,7 +20,6 @@ from app.services.whatsapp_service import (
 
 logger = logging.getLogger("akoweai")
 
-# Reminder stages in order, with their due_date offsets
 _REMINDER_STAGES: list[tuple[str, timedelta]] = [
     ("7_day", timedelta(days=-7)),
     ("3_day", timedelta(days=-3)),
@@ -51,15 +44,10 @@ class ReminderService:
         period: ContributionPeriod,
         member_ids: list[UUID],
     ) -> None:
-        """
-        Insert 6 ReminderLog records per eligible member for the given period.
-        Idempotent — uses ON CONFLICT DO NOTHING on the (member_id, period_id, stage)
-        unique constraint. Skips members who have already paid (pre-payment guard).
-        """
+        """Schedule reminder stages for unpaid members in a period."""
         if not member_ids:
             return
 
-        # Single query: find which members have already paid for this period
         paid_result = await self.db.execute(
             select(Contribution.member_id).where(
                 Contribution.period_id == period.id,

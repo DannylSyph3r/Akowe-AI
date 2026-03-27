@@ -1,7 +1,4 @@
-"""
-Central intent dispatcher for WhatsApp conversation flows.
-Routes intents to the correct flow handler based on member presence and role.
-"""
+"""Central dispatcher for WhatsApp conversation flows."""
 
 import logging
 from uuid import UUID
@@ -106,14 +103,7 @@ async def dispatch_intent(
     member: Member | None,
     db: AsyncSession,
 ) -> None:
-    """
-    Route the classified intent to the correct flow handler.
-    Handles:
-    - Unregistered users (member is None)
-    - Cooperative context resolution (single vs multi-coop)
-    - Role-based routing (member vs exco)
-    """
-    # Import flow handlers inside function to avoid circular imports at module load
+    """Route intent to the correct flow handler based on user and context."""
     from app.flows.admin_flows import (
         handle_broadcast_flow,
         handle_coop_status_intent,
@@ -132,7 +122,6 @@ async def dispatch_intent(
         handle_register_flow,
     )
 
-    # --- Unregistered user ---
     if member is None:
         if intent == Intent.REGISTER or session.current_flow == "REGISTER":
             await handle_register_flow(phone, session, db)
@@ -149,7 +138,6 @@ async def dispatch_intent(
         )
         return
 
-    # --- Registered member: resolve cooperative context ---
     coop_repo = CooperativeRepository(db)
     coops = await coop_repo.get_member_cooperatives(member.id)
 
@@ -160,7 +148,6 @@ async def dispatch_intent(
         )
         return
 
-    # Auto-set active coop when member has only one
     if session.active_cooperative_id is None:
         if len(coops) == 1:
             coop, cm = coops[0]
@@ -175,7 +162,6 @@ async def dispatch_intent(
             await send_cooperative_switcher(phone, coop_list)
             return
 
-    # --- Handle cooperative switcher selection ---
     if intent == Intent.SWITCH_COOP:
         coop_id_str = entities.get("coop_id")
         if coop_id_str:
@@ -228,10 +214,7 @@ async def dispatch_intent(
 
     is_exco = coop_member_role == Role.EXCO.value
 
-    # --- Route to flow handlers ---
-
     if intent == Intent.REGISTER:
-        # Already registered — show appropriate menu
         if is_exco:
             await send_exco_main_menu(
                 phone, member.full_name,
@@ -244,11 +227,8 @@ async def dispatch_intent(
     elif intent == Intent.PAY:
         row_id = entities.get("row_id")
         if session.current_flow == "PAY_SELECTION" and row_id:
-            # Continuing an active selection — period row was tapped
             await handle_pay_period_selected(phone, member, coop_id, row_id, session, db)
         else:
-            # Explicit new pay attempt (e.g. main menu "Pay Now" button).
-            # Reset any stale PAY_SELECTION state so the user starts fresh.
             if session.current_flow == "PAY_SELECTION":
                 session.current_flow = None
                 session.current_step = 0
@@ -256,11 +236,9 @@ async def dispatch_intent(
             await handle_pay_intent(phone, member, session, coop_id, db)
 
     elif intent == Intent.ADD_PERIOD:
-        # User wants to add another period to their selection
         if session.current_flow == "PAY_SELECTION":
             await handle_add_period(phone, member, coop_id, session, db)
         else:
-            # No active selection — start fresh pay flow
             await handle_pay_intent(phone, member, session, coop_id, db)
 
     elif intent == Intent.CONFIRM_PAY:
@@ -270,7 +248,6 @@ async def dispatch_intent(
         await handle_balance_intent(phone, member, coop_id, db)
 
     elif intent == Intent.HISTORY:
-        # Reset page when user explicitly requests history
         session.flow_data.pop("history_page", None)
         has_more = await handle_history_intent(phone, member, coop_id, 0, db)
         if has_more:
@@ -375,8 +352,6 @@ async def dispatch_intent(
             await send_member_main_menu(phone, multi_coop=len(coops) > 1)
 
     elif intent == Intent.SHOW_SWITCHER:
-        # Don't clear active_cooperative_id — it stays set so SWITCH_COOP
-        # can update it correctly when the user picks from the list
         session.current_flow = None
         session.current_step = 0
         session.flow_data = {}
@@ -384,7 +359,6 @@ async def dispatch_intent(
             coop_list = [{"id": str(c.id), "name": c.name} for c, _ in coops]
             await send_cooperative_switcher(phone, coop_list)
         else:
-            # Single coop — nothing to switch, just show menu
             if is_exco:
                 await send_exco_main_menu(
                     phone, member.full_name,

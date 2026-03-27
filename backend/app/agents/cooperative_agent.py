@@ -1,10 +1,4 @@
-"""
-ADK cooperative advisor agent — Phase 11.
-
-One agent is instantiated per API request, scoped to a single cooperative
-via coop_id baked into the system prompt at creation time.
-The query_cooperative_data tool runs synchronously on the readonly_engine.
-"""
+"""Cooperative advisor agent powered by ADK."""
 
 import json
 import logging
@@ -19,11 +13,7 @@ logger = logging.getLogger("akoweai")
 
 
 def query_cooperative_data(sql: str) -> str:
-    """
-    Execute a read-only SQL SELECT against the cooperative database.
-    Automatically enforces LIMIT 200 if not already present.
-    Returns results as a JSON string, or a descriptive error string on failure.
-    """
+    """Execute read-only SQL SELECT, auto-limiting to 200 rows."""
     from app.core.database import readonly_engine
 
     if readonly_engine is None:
@@ -44,11 +34,7 @@ def query_cooperative_data(sql: str) -> str:
 
 
 def create_cooperative_agent(coop_id: UUID) -> LlmAgent:
-    """
-    Instantiate an LlmAgent scoped to the given cooperative.
-    The coop_id is baked into the system prompt — it cannot be overridden
-    by user input at runtime.
-    """
+    """Create an agent scoped to a specific cooperative."""
     return LlmAgent(
         name="cooperative_advisor",
         model="gemini-3-flash-preview",

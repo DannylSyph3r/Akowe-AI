@@ -16,8 +16,6 @@ from app.services.session_service import load_or_create_session, save_session
 from app.services.whatsapp_service import send_text_message
 
 
-# In-memory dedup for Meta's duplicate webhook deliveries.
-# Module-level dict is safe for single-instance Railway deployments.
 _processed_message_ids: dict[str, float] = {}
 _DEDUP_TTL_SECONDS = 60.0
 
@@ -27,7 +25,6 @@ def _is_duplicate(message_id: str) -> bool:
     if not message_id:
         return False
     now = time.time()
-    # Evict expired entries to prevent unbounded growth
     stale_keys = [k for k, t in _processed_message_ids.items() if now - t > _DEDUP_TTL_SECONDS]
     for k in stale_keys:
         del _processed_message_ids[k]
@@ -43,11 +40,7 @@ logger = logging.getLogger("akoweai")
 
 
 def _verify_meta_signature(raw_body: bytes, signature_header: str) -> bool:
-    """
-    Verify X-Hub-Signature-256 from Meta.
-    Signature format: "sha256=<hex_digest>"
-    Signed with HMAC-SHA256 of raw body using META_APP_SECRET.
-    """
+    """Verify X-Hub-Signature-256 using HMAC-SHA256."""
     if not signature_header.startswith("sha256="):
         return False
     received_sig = signature_header[len("sha256="):]
@@ -60,10 +53,7 @@ def _verify_meta_signature(raw_body: bytes, signature_header: str) -> bool:
 
 
 def extract_message_data(payload: dict) -> dict | None:
-    """
-    Parse the Meta webhook payload to extract sender info and message content.
-    Returns None for non-message events (e.g., status updates) — caller silently ignores these.
-    """
+    """Extract sender and message content from Meta webhook payload."""
     try:
         entry = payload.get("entry", [{}])[0]
         changes = entry.get("changes", [{}])[0]
@@ -101,18 +91,13 @@ def extract_message_data(payload: dict) -> dict | None:
 
 
 async def _process_whatsapp_message(payload: dict) -> None:
-    """
-    Background task: process an incoming WhatsApp message end-to-end.
-    Opens its own DB session — never uses the request session.
-    """
+    """Process an incoming WhatsApp message end-to-end."""
     async with AsyncSessionFactory() as db:
         try:
             message_data = extract_message_data(payload)
             if message_data is None:
-                # Silently ignore status updates and non-message events
                 return
 
-            # Deduplicate — Meta sometimes delivers the same webhook twice
             message_id = message_data.get("message_id", "")
             if _is_duplicate(message_id):
                 logger.info("Skipping duplicate webhook delivery for message %s", message_id)
@@ -122,32 +107,25 @@ async def _process_whatsapp_message(payload: dict) -> None:
             if not phone:
                 return
 
-            # Load or create conversation session — get expiry flag
             session, was_expired = await load_or_create_session(phone, db)
 
-            # Notify user if their previous flow session timed out
             if was_expired:
                 await send_text_message(
                     phone,
                     "⏱ Your session expired after a period of inactivity. Picking up where you left off — your menu is on its way! 👇",
                 )
 
-            # If this is a text message, store the text in flow_data so flow
-            # handlers can read it (blocking flows use current_text)
             if message_data.get("message_type") == "text":
                 session.flow_data = {
                     **session.flow_data,
                     "current_text": message_data.get("text", ""),
                 }
 
-            # Look up the member by phone number
             member_repo = MemberRepository(db)
             member = await member_repo.get_by_phone(phone)
 
-            # Route to the correct intent
             intent, entities = await route_message(session, message_data, member)
 
-            # Dispatch to the appropriate flow handler
             from app.flows.dispatch import dispatch_intent
             await dispatch_intent(
                 phone=phone,
@@ -158,7 +136,6 @@ async def _process_whatsapp_message(payload: dict) -> None:
                 db=db,
             )
 
-            # Persist updated session state
             await save_session(session, db)
             await db.commit()
 
@@ -169,10 +146,7 @@ async def _process_whatsapp_message(payload: dict) -> None:
 
 @router.get("/whatsapp")
 async def whatsapp_verify(request: Request) -> PlainTextResponse:
-    """
-    Meta webhook verification endpoint.
-    Meta sends a GET request with hub.mode, hub.verify_token, and hub.challenge.
-    """
+    """Verify Meta webhook subscription."""
     params = request.query_params
     mode = params.get("hub.mode")
     token = params.get("hub.verify_token")
@@ -189,17 +163,12 @@ async def whatsapp_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict:
-    """
-    Main WhatsApp webhook endpoint.
-    Returns 200 immediately after signature verification.
-    All message processing happens in a background task.
-    """
+    """Receive and process WhatsApp webhook events."""
     raw_body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
 
     if not _verify_meta_signature(raw_body, signature):
         logger.warning("WhatsApp webhook signature verification failed — ignoring request")
-        # Still return 200 to prevent Meta from retrying (we just don't process)
         return {"status": "ok"}
 
     try:

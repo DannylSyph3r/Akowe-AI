@@ -1,10 +1,4 @@
-"""
-Chatbot service — Phase 11.
-
-Wraps the ADK agent runner for a single-turn question/answer interaction.
-Each call creates a fresh agent and session — no conversation history is
-persisted between requests (InMemorySessionService, MVP scope).
-"""
+"""Chatbot service — wraps ADK agent runner for single-turn Q&A."""
 
 import logging
 from uuid import UUID

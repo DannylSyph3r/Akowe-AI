@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/slethdev/akoweai/backend/app -name *.py -type f)"
+    ]
+  }
+}

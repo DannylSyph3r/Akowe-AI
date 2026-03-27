@@ -59,7 +59,6 @@ async def validation_exception_handler(
 ) -> JSONResponse:
     errors = exc.errors()
 
-    # Malformed JSON is a 400 Bad Request, not a validation error
     if errors and errors[0].get("type") == "json_invalid":
         return JSONResponse(
             status_code=400,

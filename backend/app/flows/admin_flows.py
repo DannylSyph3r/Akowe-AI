@@ -29,7 +29,6 @@ from app.services.whatsapp_service import (
 
 logger = logging.getLogger("akoweai")
 
-# Lazy singleton — only created on first use, never at import time
 _gemini_pro: GeminiProClient | None = None
 
 
@@ -45,7 +44,6 @@ def _format_naira(amount_kobo: int) -> str:
     return f"₦{amount_kobo / 100:,.0f}"
 
 
-# Coop status
 async def handle_coop_status_intent(
     phone: str,
     member: Member,
@@ -116,7 +114,6 @@ async def handle_coop_status_intent(
     )
 
 
-# Member lookup flow
 async def handle_member_lookup_flow(
     phone: str,
     session: ConversationSession,
@@ -124,15 +121,10 @@ async def handle_member_lookup_flow(
     db: AsyncSession,
     entities: dict | None = None,
 ) -> None:
-    """
-    Step 0: Ask for member name (blocking flow)
-    Step 1: Search and display results (or list if multiple)
-    Step 2: Handle list selection when multiple results returned
-    """
+    """Search for and display member details by name."""
     step = session.current_step if session.current_flow == "MEMBER_LOOKUP" else 0
     entities = entities or {}
 
-    # Step 2: User selected a member from the multi-result list
     if step == 2:
         row_id = entities.get("row_id", "")
         lookup_results: dict = session.flow_data.get("lookup_results", {})
@@ -154,7 +146,6 @@ async def handle_member_lookup_flow(
         session.flow_data = {}
         return
 
-    # Step 0: Initiate flow
     if step == 0:
         session.current_flow = "MEMBER_LOOKUP"
         session.current_step = 1
@@ -162,7 +153,6 @@ async def handle_member_lookup_flow(
         await send_text_message(phone, "🔍 Enter the member's name to look up:")
         return
 
-    # Step 1: Receive name, search
     query = session.flow_data.get("current_text", "").strip()
     if not query:
         await send_text_message(phone, "Please enter a name to search.")
@@ -246,18 +236,13 @@ async def _send_member_detail(
     )
 
 
-# Broadcast flow
 async def handle_broadcast_flow(
     phone: str,
     session: ConversationSession,
     coop_id: UUID,
     db: AsyncSession,
 ) -> None:
-    """
-    Step 0: Ask for message text (blocking flow)
-    Step 1: Show confirmation with member count
-    Step 2: Send to all members
-    """
+    """Broadcast a message to all cooperative members."""
     step = session.current_step if session.current_flow == "BROADCAST" else 0
 
     if step == 0:
@@ -341,7 +326,6 @@ async def handle_broadcast_flow(
         )
 
 
-# AI financial summary
 async def handle_coop_summary_intent(
     phone: str,
     member: Member,
@@ -389,7 +373,6 @@ async def handle_coop_summary_intent(
     )
 
 
-# Send reminders
 async def handle_send_reminders_intent(
     phone: str,
     member: Member,

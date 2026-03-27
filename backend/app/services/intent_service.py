@@ -31,14 +31,12 @@ BUTTON_INTENT_MAP: dict[str, Intent] = {
     "show_switcher": Intent.SHOW_SWITCHER,
 }
 
-# Blocking flows redirect all free text back into the flow
 _BLOCKING_FLOWS = {
     ConversationFlow.REGISTER.value,
     ConversationFlow.BROADCAST.value,
     ConversationFlow.MEMBER_LOOKUP.value,
 }
 
-# Lazy singleton — only created on first use, never at import time
 _gemini_flash: GeminiFlashClient | None = None
 
 
@@ -57,10 +55,7 @@ def classify_button_intent(button_payload: str) -> Intent:
 async def classify_text_intent(
     text: str, member_role: str
 ) -> tuple[Intent, dict]:
-    """
-    Use Gemini Flash to classify free text.
-    Returns (Intent, entities dict). Falls back to UNKNOWN on any failure.
-    """
+    """Classify free text intent using Gemini Flash."""
     prompt = f"User role: {member_role}\nUser message: {text}"
     try:
         result = await _get_flash_client().classify_intent(
@@ -82,19 +77,7 @@ async def route_message(
     message_data: dict,
     member: Member | None,
 ) -> tuple[Intent, dict]:
-    """
-    Determine the intent and entities from an incoming message.
-
-    Priority:
-    1. Button reply → direct lookup in BUTTON_INTENT_MAP
-    2. List selection:
-       - Cooperative switcher prefix → SWITCH_COOP
-       - Active PAY_SELECTION flow + period row → PAY with row_id entity
-       - Active MEMBER_LOOKUP flow + lookup row → MEMBER_LOOKUP with row_id entity
-       - Otherwise → BUTTON_INTENT_MAP lookup (menu list items)
-    3. Text + active blocking flow → return flow intent without LLM
-    4. Free text → Gemini Flash classification
-    """
+    """Determine intent from incoming message (button, list, or text)."""
     message_type = message_data.get("message_type")
     member_role = "exco" if member else "member"
 

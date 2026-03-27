@@ -25,18 +25,13 @@ def _format_naira(amount_kobo: int) -> str:
 
 
 def _serialize_period_for_session(p: dict) -> dict:
-    """
-    Convert a period dict to JSON-safe form for storage in session flow_data.
-    UUID and date objects are not JSON-serializable — convert them to strings.
-    """
+    """Convert period dict to JSON-safe form (UUID and date to string)."""
     from datetime import date
     import uuid as _uuid
 
     serialized = dict(p)
-    # UUID → str
     if serialized.get("id") is not None:
         serialized["id"] = str(serialized["id"])
-    # date → ISO string
     for key in ("start_date", "due_date"):
         val = serialized.get(key)
         if isinstance(val, date):
@@ -44,18 +39,12 @@ def _serialize_period_for_session(p: dict) -> dict:
     return serialized
 
 
-# Registration flow
 async def handle_register_flow(
     phone: str,
     session: ConversationSession,
     db: AsyncSession,
 ) -> None:
-    """
-    Multi-step registration flow for WhatsApp-only members.
-    Step 0: Ask for full name
-    Step 1: Receive name, ask for join code
-    Step 2: Validate join code, create member, join coop
-    """
+    """Multi-step registration: name → join code → member creation."""
     step = session.current_step if session.current_flow == "REGISTER" else 0
 
     if step == 0:
@@ -102,7 +91,6 @@ async def handle_register_flow(
             )
             return
 
-        # Success — reset flow and show confirmation
         session.current_flow = None
         session.current_step = 0
         session.flow_data = {}
@@ -128,20 +116,14 @@ async def _register_whatsapp_member(
     join_code: str,
     db: AsyncSession,
 ) -> dict:
-    """
-    Validate join code, get-or-create member, then join coop.
-    Member creation only happens AFTER code validation succeeds.
-    join_cooperative() handles its own commit — no second commit needed here.
-    """
+    """Validate join code, create/get member, and join cooperative."""
     from app.repositories.join_code_repository import JoinCodeRepository
 
-    # 1. Pre-validate the code without consuming it
     join_svc = JoinCodeService(db)
     code_repo = JoinCodeRepository(db)
     jc = await code_repo.get_by_code(join_code)
-    join_svc._validate_code(jc)  # raises BadRequestException if invalid
+    join_svc._validate_code(jc)
 
-    # 2. Get or create the member record (only after code is confirmed valid)
     member_repo = MemberRepository(db)
     member = await member_repo.get_by_phone(phone)
     if member is None:
@@ -152,12 +134,9 @@ async def _register_whatsapp_member(
         )
         await db.flush()
 
-    # 3. Join cooperative — validates again, redeems code, creates CoopMember
-    #    and first Contribution record, then commits internally
     return await join_svc.join_cooperative(join_code, member.id)
 
 
-# Payment flows
 async def handle_pay_intent(
     phone: str,
     member: Member,

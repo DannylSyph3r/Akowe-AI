@@ -1,10 +1,4 @@
-"""
-Chatbot router — Phase 11.
-
-POST /cooperatives/{coop_id}/chat — restricted to exco members.
-Delegates to the ADK chatbot service. Always returns HTTP 200 with
-an answer string — errors surface as a graceful fallback message.
-"""
+"""Chatbot endpoint for cooperative AI advisor."""
 
 from uuid import UUID
 
