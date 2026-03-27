@@ -1,15 +1,35 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, User } from "lucide-react";
-import { toast } from "sonner";
-import { logout, getStoredUser } from "@/lib/api/auth";
+import { LogOut, Menu, User } from "lucide-react";
+import { logout } from "@/lib/api/auth";
 import { useCoop } from "@/context/CoopContext";
+import type { StoredUser } from "@/lib/api/types";
 
-export function TopBar() {
+const noopSubscribe = () => () => {};
+
+export function TopBar({
+  onOpenMobileNav,
+}: {
+  onOpenMobileNav: () => void;
+}) {
   const router = useRouter();
-  const user = getStoredUser();
+  const storedUser = useSyncExternalStore(
+    noopSubscribe,
+    () => (typeof window === "undefined" ? null : localStorage.getItem("user")),
+    () => null,
+  );
   const { activeCoop } = useCoop();
+  let user: StoredUser | null = null;
+
+  if (storedUser) {
+    try {
+      user = JSON.parse(storedUser) as StoredUser;
+    } catch {
+      user = null;
+    }
+  }
 
   const handleLogout = async () => {
     await logout();
@@ -17,28 +37,39 @@ export function TopBar() {
   };
 
   return (
-    <header className="h-14 bg-white border-b border-border px-6 flex items-center justify-between shrink-0">
-      <div>
-        {activeCoop && (
-          <p className="text-sm font-medium text-foreground">
-            {activeCoop.name}
+    <header className="sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between border-b border-border bg-white/95 px-3 backdrop-blur sm:px-4 lg:px-6">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={onOpenMobileNav}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+          aria-label="Open navigation"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-foreground">
+            {activeCoop?.name ?? "Dashboard"}
           </p>
-        )}
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            Cooperative dashboard
+          </p>
+        </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-3">
         {user && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
             <User className="w-4 h-4" />
-            <span>{user.full_name}</span>
+            <span className="max-w-40 truncate">{user.full_name}</span>
           </div>
         )}
         <button
+          type="button"
           onClick={handleLogout}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground
-                     hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-3"
         >
           <LogOut className="w-4 h-4" />
-          Logout
+          <span className="hidden sm:inline">Logout</span>
         </button>
       </div>
     </header>

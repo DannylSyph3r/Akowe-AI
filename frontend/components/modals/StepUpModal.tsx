@@ -81,11 +81,21 @@ export function StepUpModal({
             error={error}
             autoFocus
           />
-          <div className="flex gap-2 justify-end">
-            <Button variant="ghost" type="button" onClick={handleClose}>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={handleClose}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
-            <Button type="submit" loading={loading} disabled={pin.length < 4}>
+            <Button
+              type="submit"
+              loading={loading}
+              disabled={pin.length < 4}
+              className="w-full sm:w-auto"
+            >
               Confirm
             </Button>
           </div>

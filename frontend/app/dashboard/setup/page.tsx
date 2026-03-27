@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { createCooperative, generateExcoInvite } from "@/lib/api/cooperatives";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import type { ApiError } from "@/lib/api/client";
 
 const FREQUENCY_OPTIONS = [
   { value: "weekly", label: "Weekly" },
@@ -29,13 +30,14 @@ function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
-        <code className="flex-1 text-sm font-mono text-foreground truncate">
+      <div className="flex flex-col gap-2 rounded-lg bg-muted px-3 py-2 sm:flex-row sm:items-center">
+        <code className="flex-1 break-all text-sm font-mono text-foreground">
           {value}
         </code>
         <button
+          type="button"
           onClick={copy}
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="self-end rounded-md p-1 text-muted-foreground transition-colors hover:bg-white hover:text-foreground sm:self-auto"
         >
           {copied ? (
             <Check className="w-4 h-4 text-success" />
@@ -87,9 +89,10 @@ export default function SetupPage() {
       });
       setCreated({ coopId: result.cooperative_id, joinCode: result.join_code });
       queryClient.invalidateQueries({ queryKey: ["cooperatives"] });
-    } catch (err: any) {
+    } catch (err) {
+      const apiError = err as ApiError;
       toast.error(
-        err?.response?.data?.message ?? "Failed to create cooperative",
+        apiError.response?.data?.message ?? "Failed to create cooperative",
       );
     } finally {
       setLoading(false);
@@ -111,8 +114,8 @@ export default function SetupPage() {
 
   if (created) {
     return (
-      <div className="max-w-lg mx-auto">
-        <div className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-6">
+      <div className="mx-auto max-w-3xl">
+        <div className="space-y-5 rounded-xl border border-border bg-white p-4 shadow-sm sm:space-y-6 sm:p-6">
           <div>
             <h1 className="text-lg font-semibold text-foreground">
               Cooperative Created!
@@ -131,13 +134,16 @@ export default function SetupPage() {
               variant="outline"
               onClick={handleGenerateExcoInvite}
               loading={generatingExco}
-              className="w-full"
+              className="w-full sm:w-auto"
             >
               Generate Exco Invite Code
             </Button>
           )}
 
-          <Button className="w-full" onClick={() => router.push("/dashboard")}>
+          <Button
+            className="w-full sm:w-auto"
+            onClick={() => router.push("/dashboard")}
+          >
             Go to Dashboard
           </Button>
         </div>
@@ -146,69 +152,71 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="mx-auto max-w-3xl">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-foreground">
           Create Cooperative
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Set up your cooperative's contribution schedule.
+          Set up your cooperative&apos;s contribution schedule.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-border shadow-sm p-6">
+      <div className="rounded-xl border border-border bg-white p-4 shadow-sm sm:p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Cooperative Name"
-            placeholder="e.g. Eko Women Ajo"
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            required
-          />
-          <Input
-            label="Contribution Amount (₦)"
-            type="number"
-            min="1"
-            step="1"
-            placeholder="e.g. 10000"
-            value={form.contributionAmountNaira}
-            onChange={(e) =>
-              setForm((p) => ({
-                ...p,
-                contributionAmountNaira: e.target.value,
-              }))
-            }
-            required
-          />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">
-              Frequency
-            </label>
-            <select
-              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Cooperative Name"
+              placeholder="e.g. Eko Women Ajo"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              required
+            />
+            <Input
+              label="Contribution Amount (₦)"
+              type="number"
+              min="1"
+              step="1"
+              placeholder="e.g. 10000"
+              value={form.contributionAmountNaira}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  contributionAmountNaira: e.target.value,
+                }))
+              }
+              required
+            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Frequency
+              </label>
+              <select
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm
                          text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20
                          focus:border-primary transition-colors"
-              value={form.frequency}
+                value={form.frequency}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, frequency: e.target.value }))
+                }
+              >
+                {FREQUENCY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label="Anchor Date"
+              type="date"
+              value={form.anchorDate}
               onChange={(e) =>
-                setForm((p) => ({ ...p, frequency: e.target.value }))
+                setForm((p) => ({ ...p, anchorDate: e.target.value }))
               }
-            >
-              {FREQUENCY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              required
+            />
           </div>
-          <Input
-            label="Anchor Date"
-            type="date"
-            value={form.anchorDate}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, anchorDate: e.target.value }))
-            }
-            required
-          />
           <Input
             label="Due Day Offset (days after period start)"
             type="number"
@@ -220,9 +228,15 @@ export default function SetupPage() {
             }
             required
           />
-          <Button type="submit" loading={loading} className="w-full">
-            Create Cooperative
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="submit"
+              loading={loading}
+              className="w-full sm:w-auto"
+            >
+              Create Cooperative
+            </Button>
+          </div>
         </form>
       </div>
     </div>

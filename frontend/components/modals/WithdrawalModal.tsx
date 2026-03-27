@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { recordWithdrawal } from "@/lib/api/cooperatives";
+import type { ApiError } from "@/lib/api/client";
 
 interface WithdrawalModalProps {
   open: boolean;
@@ -47,9 +48,10 @@ export function WithdrawalModal({
       toast.success("Withdrawal recorded successfully");
       onSuccess();
       handleClose();
-    } catch (err: any) {
+    } catch (err) {
+      const apiError = err as ApiError;
       toast.error(
-        err?.response?.data?.message ?? "Failed to record withdrawal",
+        apiError.response?.data?.message ?? "Failed to record withdrawal",
       );
     } finally {
       setLoading(false);
@@ -84,8 +86,13 @@ export function WithdrawalModal({
             required
           />
         </div>
-        <div className="flex gap-2 justify-end">
-          <Button variant="ghost" type="button" onClick={handleClose}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={handleClose}
+            className="w-full sm:w-auto"
+          >
             Cancel
           </Button>
           <Button
@@ -93,6 +100,7 @@ export function WithdrawalModal({
             variant="destructive"
             loading={loading}
             disabled={!amountNaira || !reason.trim()}
+            className="w-full sm:w-auto"
           >
             Record Withdrawal
           </Button>

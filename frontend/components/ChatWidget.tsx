@@ -78,12 +78,11 @@ export function ChatWidget({ coopId }: ChatWidgetProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-3 sm:p-4 sm:space-y-4">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12">
+          <div className="flex h-full flex-col items-center justify-center py-8 text-center sm:py-12">
             <p className="text-muted-foreground text-sm mb-6">
-              Ask anything about your cooperative's finances.
+              Ask anything about your cooperative&apos;s finances.
             </p>
             <div className="flex flex-wrap gap-2 justify-center">
               {STARTER_QUESTIONS.map((q) => (
@@ -115,7 +114,7 @@ export function ChatWidget({ coopId }: ChatWidgetProps) {
             >
               <div
                 className={cn(
-                  "max-w-[80%] rounded-xl px-4 py-2.5 text-sm leading-relaxed",
+                  "max-w-[88%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed sm:max-w-[80%] sm:px-4",
                   msg.role === "user"
                     ? "bg-primary text-white rounded-br-sm"
                     : "bg-muted text-foreground rounded-bl-sm",
@@ -144,16 +143,15 @@ export function ChatWidget({ coopId }: ChatWidgetProps) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t border-border p-4">
-        <form onSubmit={handleSubmit} className="flex items-end gap-2">
+      <div className="border-t border-border p-3 sm:p-4">
+        <form onSubmit={handleSubmit} className="flex items-stretch gap-2 sm:items-end">
           <textarea
             className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm
                        text-foreground placeholder:text-muted-foreground resize-none
                        focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
-                       transition-colors max-h-32 scrollbar-thin"
+                       transition-colors max-h-32 min-h-10 scrollbar-thin"
             rows={1}
-            placeholder="Ask a question…"
+            placeholder="Ask a question..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -166,9 +164,9 @@ export function ChatWidget({ coopId }: ChatWidgetProps) {
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center
+            className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center
                        hover:bg-primary-dark transition-colors
-                       disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                       disabled:opacity-40 disabled:cursor-not-allowed shrink-0 sm:h-9 sm:w-9"
           >
             <Send className="w-4 h-4" />
           </button>

@@ -49,7 +49,7 @@ export function Modal({
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
             onClick={onClose}
           />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4">
             <motion.div
               key="modal"
               initial={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -57,13 +57,13 @@ export function Modal({
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
-                "w-full max-w-md rounded-xl bg-white shadow-xl border border-border",
+                "max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-xl border border-border bg-white shadow-xl",
                 className,
               )}
               onClick={(e) => e.stopPropagation()}
             >
               {title && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 sm:py-4">
                   <h2 className="text-base font-semibold text-foreground">
                     {title}
                   </h2>
@@ -76,7 +76,7 @@ export function Modal({
                   </button>
                 </div>
               )}
-              <div className="p-6">{children}</div>
+              <div className="p-4 sm:p-6">{children}</div>
             </motion.div>
           </div>
         </>
