@@ -9,6 +9,7 @@ import { getCooperative, updateSettings } from "@/lib/api/cooperatives";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { StepUpModal } from "@/components/modals/StepUpModal";
+import type { ApiError } from "@/lib/api/client";
 
 const FREQUENCY_OPTIONS = [
   { value: "weekly", label: "Weekly" },
@@ -78,15 +79,18 @@ export default function SettingsPage() {
       );
       toast.success("Settings updated");
       queryClient.invalidateQueries({ queryKey: ["coop", coopId, "detail"] });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Failed to update settings");
+    } catch (err) {
+      const apiError = err as ApiError;
+      toast.error(
+        apiError.response?.data?.message ?? "Failed to update settings",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-3xl space-y-5 sm:space-y-6">
       <h1 className="text-xl font-semibold text-foreground">Settings</h1>
 
       <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
@@ -95,38 +99,40 @@ export default function SettingsPage() {
         period onwards.
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-6 space-y-4">
-        <Input
-          label="Contribution Amount (₦)"
-          type="number"
-          min="1"
-          value={form.contributionAmountNaira}
-          onChange={(e) =>
-            setForm((p) => ({
-              ...p,
-              contributionAmountNaira: e.target.value,
-            }))
-          }
-        />
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-foreground">
-            Frequency
-          </label>
-          <select
-            className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm
+      <div className="space-y-4 rounded-xl border border-border bg-white p-4 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Contribution Amount (₦)"
+            type="number"
+            min="1"
+            value={form.contributionAmountNaira}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                contributionAmountNaira: e.target.value,
+              }))
+            }
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              Frequency
+            </label>
+            <select
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm
                        text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20
                        focus:border-primary transition-colors"
-            value={form.frequency}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, frequency: e.target.value }))
-            }
-          >
-            {FREQUENCY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+              value={form.frequency}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, frequency: e.target.value }))
+              }
+            >
+              {FREQUENCY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <Input
           label="Due Day Offset (days)"
@@ -138,13 +144,15 @@ export default function SettingsPage() {
             setForm((p) => ({ ...p, dueDayOffset: e.target.value }))
           }
         />
-        <Button
-          onClick={handleOpenStepUp}
-          loading={submitting}
-          className="w-full"
-        >
-          Save Changes
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button
+            onClick={handleOpenStepUp}
+            loading={submitting}
+            className="w-full sm:w-auto"
+          >
+            Save Changes
+          </Button>
+        </div>
       </div>
 
       <StepUpModal

@@ -1,11 +1,17 @@
 import axios, {
-  type AxiosRequestConfig,
+  type AxiosError,
   type InternalAxiosRequestConfig,
 } from "axios";
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
+
+interface ApiErrorResponse {
+  message?: string;
+}
+
+export type ApiError = AxiosError<ApiErrorResponse>;
 
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
