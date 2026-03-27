@@ -364,6 +364,16 @@ async def dispatch_intent(
         else:
             await send_member_main_menu(phone, multi_coop=len(coops) > 1)
 
+    elif intent == Intent.SHOW_MENU:
+        if is_exco:
+            await send_exco_main_menu(
+                phone, member.full_name,
+                coop_name=active_coop_name,
+                multi_coop=len(coops) > 1,
+            )
+        else:
+            await send_member_main_menu(phone, multi_coop=len(coops) > 1)
+
     elif intent == Intent.SHOW_SWITCHER:
         # Don't clear active_cooperative_id — it stays set so SWITCH_COOP
         # can update it correctly when the user picks from the list
