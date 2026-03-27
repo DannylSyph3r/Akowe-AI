@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import and_, func, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cooperative import Cooperative
@@ -321,21 +321,31 @@ class CooperativeRepository:
         self, coop_id: UUID, period_id: UUID
     ) -> list[dict]:
         """
-        Return a list of members with unpaid contributions for the given period.
-        Each dict has: member_id, full_name, phone_number.
+        Return all members of the cooperative who have not paid for the given period.
+        This includes members with an explicit 'unpaid' contribution record AND
+        members who have no contribution record at all for this period (timing gap
+        on join — both are correctly treated as unpaid).
         """
-        from app.models.contribution import Contribution
         from app.models.member import Member as MemberModel
+        from app.models.contribution import Contribution
 
         result = await self.db.execute(
             select(MemberModel.id, MemberModel.full_name, MemberModel.phone_number)
-            .join(Contribution, Contribution.member_id == MemberModel.id)
-            .where(
+            .join(CoopMember, CoopMember.member_id == MemberModel.id)
+            .outerjoin(
+                Contribution,
                 and_(
+                    Contribution.member_id == MemberModel.id,
                     Contribution.cooperative_id == coop_id,
                     Contribution.period_id == period_id,
+                ),
+            )
+            .where(
+                CoopMember.cooperative_id == coop_id,
+                or_(
+                    Contribution.id.is_(None),
                     Contribution.status == "unpaid",
-                )
+                ),
             )
         )
         rows = result.all()
