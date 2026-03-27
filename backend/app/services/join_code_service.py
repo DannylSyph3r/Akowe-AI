@@ -126,30 +126,20 @@ class JoinCodeService:
         coop = await self.coop_repo.get_by_id(coop_id)
         if not coop:
             raise NotFoundException("Cooperative not found")
-
-        # 5. If there is an open period, create a contribution record for the new member
-        open_period = await self.period_repo.get_open_period(coop_id)
-        if open_period:
-            self.db.add(
-                Contribution(
-                    member_id=member_id,
-                    cooperative_id=coop_id,
-                    period_id=open_period.id,
-                    amount=coop.contribution_amount,
-                    status="unpaid",
-                )
+            
+        from app.services.period_service import PeriodService
+        open_period = await PeriodService(self.db).get_or_create_current_period(coop_id)
+        self.db.add(
+            Contribution(
+                member_id=member_id,
+                cooperative_id=coop_id,
+                period_id=open_period.id,
+                amount=coop.contribution_amount,
+                status="unpaid",
             )
+        )
 
-        # 6. Resolve next_due_date for the response
-        if open_period:
-            next_due_date = open_period.due_date
-        else:
-            schedule = await self.schedule_repo.get_active(coop_id)
-            if schedule:
-                latest = await self.period_repo.get_latest_period_number(coop_id)
-                _, next_due_date = compute_next_period_dates(schedule, latest)
-            else:
-                next_due_date = None
+        next_due_date = open_period.due_date
 
         await self.db.commit()
 
