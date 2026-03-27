@@ -1,8 +1,6 @@
 from datetime import date, datetime
 from uuid import UUID
-
-from pydantic import BaseModel, field_validator
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.core.enums import Frequency, RiskLevel, Role
 
 
@@ -133,3 +131,34 @@ class PayablePeriodItem(BaseModel):
 
 class PayablePeriodsResponse(BaseModel):
     periods: list[PayablePeriodItem]
+
+
+class RecordWithdrawalRequest(BaseModel):
+    amount_kobo: int = Field(..., gt=0, description="Withdrawal amount in kobo")
+    reason: str = Field(..., min_length=3, max_length=500)
+
+
+class RecordWithdrawalResponse(BaseModel):
+    withdrawal_id: UUID
+    pool_balance_after: int
+
+
+class WithdrawalListItem(BaseModel):
+    id: UUID
+    amount: int
+    reason: str
+    authorized_by_name: str
+    pool_balance_after: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedWithdrawals(BaseModel):
+    items: list[WithdrawalListItem]
+    page: int
+    page_size: int
+
+
+class InsightResponse(BaseModel):
+    insight: str
