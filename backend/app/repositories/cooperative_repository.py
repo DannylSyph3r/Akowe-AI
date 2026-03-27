@@ -256,11 +256,12 @@ class CooperativeRepository:
     ) -> dict:
         """
         Return aggregated financial data for the last N days.
-        Used by AI summary flows.
+        Used by AI summary flows and the WhatsApp financial summary handler.
         """
         from datetime import datetime, timedelta, timezone
         from app.models.contribution import Contribution
         from app.models.contribution_period import ContributionPeriod
+        from app.models.withdrawal import Withdrawal
 
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
@@ -275,6 +276,17 @@ class CooperativeRepository:
             )
         )
         contributions_kobo = contrib_result.scalar_one() or 0
+
+        # Withdrawals recorded in the last N days
+        withdrawal_result = await self.db.execute(
+            select(func.coalesce(func.sum(Withdrawal.amount), 0)).where(
+                and_(
+                    Withdrawal.cooperative_id == coop_id,
+                    Withdrawal.created_at >= since,
+                )
+            )
+        )
+        withdrawals_kobo = withdrawal_result.scalar_one() or 0
 
         # Outstanding unpaid contributions (all time)
         unpaid_result = await self.db.execute(
@@ -326,7 +338,7 @@ class CooperativeRepository:
 
         return {
             "contributions_kobo": int(contributions_kobo),
-            "withdrawals_kobo": 0,  # Phase 8 — withdrawal model not queried yet
+            "withdrawals_kobo": int(withdrawals_kobo),
             "outstanding_debt_kobo": int(outstanding_debt_kobo),
             "paid_count": paid_count,
             "total_count": total_count,
