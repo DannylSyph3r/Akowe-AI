@@ -1,6 +1,7 @@
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -14,6 +15,7 @@ from app.core.enums import RiskLevel, StepUpAction
 from app.core.responses import ApiResponse
 from app.models.member import Member
 from app.repositories.cooperative_repository import CooperativeRepository
+from app.prompts.financial_summary import COOP_STATUS_INSIGHT_PROMPT
 from app.schemas.cooperative import (
     CooperativeDetailResponse,
     CooperativeListItem,
@@ -22,16 +24,25 @@ from app.schemas.cooperative import (
     ExcoInviteRequest,
     ExcoInviteResponse,
     GenerateJoinCodesRequest,
+    InsightResponse,
     JoinCodeItem,
     JoinCodesResponse,
     MemberListItem,
+    PaginatedWithdrawals,
     PayablePeriodItem,
     PayablePeriodsResponse,
+    RecordWithdrawalRequest,
+    RecordWithdrawalResponse,
     UpdateSettingsRequest,
+    WithdrawalListItem,
 )
 from app.services.cooperative_service import CooperativeService
+from app.services.gemini_service import GeminiProClient
 from app.services.join_code_service import JoinCodeService
 from app.services.period_service import PeriodService
+from app.services.withdrawal_service import WithdrawalService
+
+logger = logging.getLogger("akoweai")
 
 router = APIRouter(prefix="/cooperatives", tags=["cooperatives"])
 
@@ -177,5 +188,101 @@ async def get_payable_periods(
         data=PayablePeriodsResponse(
             periods=[PayablePeriodItem(**p) for p in periods]
         ),
+        message="OK",
+    )
+
+
+@router.post("/{coop_id}/withdrawals", status_code=201)
+async def record_withdrawal(
+    coop_id: UUID,
+    body: RecordWithdrawalRequest,
+    current_member: Member = Depends(get_current_member),
+    _exco=Depends(require_coop_exco),
+    _step_up=Depends(require_step_up(StepUpAction.WITHDRAWAL)),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    result = await WithdrawalService(db).record_withdrawal(
+        coop_id=coop_id,
+        amount_kobo=body.amount_kobo,
+        reason=body.reason,
+        authorized_by_member_id=current_member.id,
+    )
+    return ApiResponse.success(
+        data=RecordWithdrawalResponse(**result),
+        message="Withdrawal recorded",
+        status_code=201,
+    )
+
+
+@router.get("/{coop_id}/withdrawals")
+async def list_withdrawals(
+    coop_id: UUID,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    _membership=Depends(get_coop_membership),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    items = await WithdrawalService(db).get_withdrawals(coop_id, page, page_size)
+    return ApiResponse.success(
+        data=PaginatedWithdrawals(
+            items=[WithdrawalListItem(**item) for item in items],
+            page=page,
+            page_size=page_size,
+        ),
+        message="OK",
+    )
+
+
+@router.get("/{coop_id}/insights")
+async def get_insights(
+    coop_id: UUID,
+    _exco=Depends(require_coop_exco),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    rows = await CooperativeRepository(db).get_members_with_stats(coop_id)
+
+    at_risk = [
+        row for row in rows if row["late_count"] >= 1
+    ]
+
+    if not at_risk:
+        return ApiResponse.success(
+            data=InsightResponse(insight="All members are up to date with contributions."),
+            message="OK",
+        )
+
+    coop_result = await CooperativeRepository(db).get_by_id(coop_id)
+    coop_name = coop_result.name if coop_result else "this cooperative"
+    member_count = len(rows)
+    high_risk_names = [
+        row["full_name"] for row in at_risk if row["late_count"] >= 2
+    ][:5]
+    medium_risk_names = [
+        row["full_name"] for row in at_risk if row["late_count"] == 1
+    ][:5]
+
+    context = (
+        f"Cooperative: {coop_name}\n"
+        f"Total members: {member_count}\n"
+        f"Members at risk: {len(at_risk)}\n"
+        f"High risk (2+ late payments): {len(high_risk_names)} — "
+        f"{', '.join(high_risk_names) if high_risk_names else 'none'}\n"
+        f"Medium risk (1 late payment): {len(medium_risk_names)} — "
+        f"{', '.join(medium_risk_names) if medium_risk_names else 'none'}"
+    )
+
+    try:
+        insight = await GeminiProClient().generate_summary(
+            context, COOP_STATUS_INSIGHT_PROMPT
+        )
+    except Exception as exc:
+        logger.warning("Gemini insight generation failed: %s", exc)
+        insight = (
+            f"{len(at_risk)} member(s) have late or missed contributions "
+            f"and may need follow-up."
+        )
+
+    return ApiResponse.success(
+        data=InsightResponse(insight=insight),
         message="OK",
     )
