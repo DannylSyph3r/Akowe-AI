@@ -16,7 +16,6 @@ class Cooperative(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     contribution_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     due_day_offset: Mapped[int] = mapped_column(Integer, nullable=False)
-    # use_alter=True breaks the circular FK dependency with members at DDL time
     created_by_member_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("members.id", use_alter=True, name="fk_cooperatives_created_by"),

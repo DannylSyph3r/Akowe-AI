@@ -241,7 +241,7 @@ async def _verify_and_process_payment(txnref: str, posted_amount: int) -> None:
                 )
             except Exception:
                 logger.exception("Interswitch requery failed for ref=%s", txnref)
-                return  # Don't mark failed — we don't know what happened
+                return
 
             response_code = status_data.get("ResponseCode", "")
             returned_amount = status_data.get("Amount", 0)

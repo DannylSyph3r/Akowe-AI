@@ -35,13 +35,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
-# ---------------------------------------------------------------------------
-# Read-only synchronous engine — used exclusively by the ADK chatbot tool.
-# Synchronous because ADK tool functions must be regular (non-async) callables.
-# Pool size kept small; statement_timeout prevents runaway agent-generated queries.
-# Deviation D26: readonly_engine is a module-level export initialised at startup.
-# ---------------------------------------------------------------------------
-
 from sqlalchemy import create_engine as _create_sync_engine
 
 def _build_readonly_engine():

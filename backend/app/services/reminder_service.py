@@ -229,10 +229,6 @@ class ReminderService:
 
         return processed
 
-    # ------------------------------------------------------------------ #
-    # Private batch-load helpers                                           #
-    # ------------------------------------------------------------------ #
-
     async def _fetch_members(self, member_ids: set[UUID]) -> list[Member]:
         if not member_ids:
             return []

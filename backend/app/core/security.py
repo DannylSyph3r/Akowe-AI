@@ -18,10 +18,6 @@ bearer_scheme = HTTPBearer(
     auto_error=False,
 )
 
-
-
-# PIN hashing — bcrypt (slow, appropriate for secrets users choose)
-
 def hash_pin(pin: str) -> str:
     return bcrypt.using(rounds=12).hash(pin)
 

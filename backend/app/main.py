@@ -117,7 +117,7 @@ app.include_router(cooperatives.router, prefix="/api")
 app.include_router(members.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(webhooks.router, prefix="/api")
-app.include_router(internal.router)  # No /api prefix — cron-only endpoints
+app.include_router(internal.router)
 app.include_router(chatbot.router, prefix="/api")
 
 
