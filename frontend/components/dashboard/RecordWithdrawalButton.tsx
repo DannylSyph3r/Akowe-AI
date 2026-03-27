@@ -6,13 +6,16 @@ import { ArrowDownCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StepUpModal } from "@/components/modals/StepUpModal";
 import { WithdrawalModal } from "@/components/modals/WithdrawalModal";
+import { cn } from "@/lib/utils";
 
 interface RecordWithdrawalButtonProps {
   coopId: string;
+  className?: string;
 }
 
 export function RecordWithdrawalButton({
   coopId,
+  className,
 }: RecordWithdrawalButtonProps) {
   const queryClient = useQueryClient();
   const [stepUpOpen, setStepUpOpen] = useState(false);
@@ -33,7 +36,11 @@ export function RecordWithdrawalButton({
 
   return (
     <>
-      <Button variant="outline" onClick={() => setStepUpOpen(true)}>
+      <Button
+        variant="outline"
+        onClick={() => setStepUpOpen(true)}
+        className={cn(className)}
+      >
         <ArrowDownCircle className="w-4 h-4" />
         Record Withdrawal
       </Button>

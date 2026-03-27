@@ -1,48 +1,56 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { MobileNavDrawer, Sidebar } from "@/components/dashboard/Sidebar";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { CoopProvider, useCoop } from "@/context/CoopContext";
-import { getAccessToken } from "@/lib/api/auth";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { allCoops, isLoading } = useCoop();
+  const { allCoops, isLoading, isReady, hasAccessToken } = useCoop();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const requiresSetupRedirect =
+    isReady &&
+    hasAccessToken &&
+    !isLoading &&
+    allCoops.length === 0 &&
+    pathname !== "/dashboard/setup";
 
   useEffect(() => {
-    if (!getAccessToken()) {
+    if (isReady && !hasAccessToken) {
       router.replace("/login");
     }
-  }, [router]);
+  }, [hasAccessToken, isReady, router]);
 
   useEffect(() => {
-    if (
-      !isLoading &&
-      allCoops.length === 0 &&
-      !!getAccessToken() &&
-      pathname !== "/dashboard/setup"
-    ) {
+    if (requiresSetupRedirect) {
       router.replace("/dashboard/setup");
     }
-  }, [isLoading, allCoops, router, pathname]);
+  }, [requiresSetupRedirect, router]);
 
-  if (isLoading) {
+  if (!isReady || isLoading || !hasAccessToken || requiresSetupRedirect) {
     return (
-      <div className="flex h-screen items-center justify-center bg-muted">
+      <div className="flex h-[100dvh] items-center justify-center bg-muted">
         <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-muted overflow-hidden">
+    <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-muted">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopBar onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

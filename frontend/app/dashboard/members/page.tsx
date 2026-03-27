@@ -19,22 +19,147 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+
   const copy = async () => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
   return (
     <button
+      type="button"
       onClick={copy}
-      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-white hover:text-foreground"
     >
       {copied ? (
-        <Check className="w-3.5 h-3.5 text-success" />
+        <Check className="h-3.5 w-3.5 text-success" />
       ) : (
-        <Copy className="w-3.5 h-3.5" />
+        <Copy className="h-3.5 w-3.5" />
       )}
     </button>
+  );
+}
+
+function JoinCodeRoleBadge({ role }: { role: string }) {
+  const isExco = role === "exco";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+        isExco ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+      }`}
+    >
+      {isExco ? "Exco" : "Member"}
+    </span>
+  );
+}
+
+function MemberCard({
+  member,
+}: {
+  member: {
+    member_id: string;
+    full_name: string;
+    role: string;
+    total_contributed: number;
+    periods_paid: number;
+    last_paid_at: string | null;
+    risk_level: "LOW" | "MEDIUM" | "HIGH";
+  };
+}) {
+  return (
+    <article className="space-y-3 rounded-xl border border-border bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold text-foreground">
+            {member.full_name}
+          </h2>
+          <p className="text-sm capitalize text-muted-foreground">
+            {member.role}
+          </p>
+        </div>
+        <RiskBadge level={member.risk_level} />
+      </div>
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <div className="space-y-1">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Total Contributed
+          </dt>
+          <dd className="font-medium text-foreground">
+            {formatNaira(member.total_contributed)}
+          </dd>
+        </div>
+        <div className="space-y-1">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Periods Paid
+          </dt>
+          <dd className="font-medium text-foreground">{member.periods_paid}</dd>
+        </div>
+        <div className="col-span-2 space-y-1">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Last Payment
+          </dt>
+          <dd className="text-foreground">{formatDate(member.last_paid_at)}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function JoinCodeCard({
+  code,
+  expiresAt,
+  role,
+  revoking,
+  onRevoke,
+}: {
+  code: string;
+  expiresAt: string;
+  role: string;
+  revoking: boolean;
+  onRevoke: () => void;
+}) {
+  return (
+    <article className="space-y-3 rounded-xl border border-border bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Join Code
+          </p>
+          <code className="block break-all text-sm font-mono text-foreground">
+            {code}
+          </code>
+        </div>
+        <CopyButton text={code} />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Role
+          </p>
+          <JoinCodeRoleBadge role={role} />
+        </div>
+        <div className="space-y-1 text-right">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Expires
+          </p>
+          <p className="text-sm text-foreground">{formatDate(expiresAt)}</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onRevoke}
+          disabled={revoking}
+          className="text-xs font-medium text-destructive transition-colors hover:text-destructive/80 disabled:opacity-50"
+        >
+          {revoking ? "Revoking..." : "Revoke"}
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -63,8 +188,8 @@ export default function MembersPage() {
   const [generating, setGenerating] = useState(false);
   const [revokingCode, setRevokingCode] = useState<string | null>(null);
 
-  const filtered = members.filter((m) =>
-    m.full_name.toLowerCase().includes(search.toLowerCase()),
+  const filtered = members.filter((member) =>
+    member.full_name.toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleGenerateCodes = async () => {
@@ -102,22 +227,46 @@ export default function MembersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <h1 className="text-xl font-semibold text-foreground">Members</h1>
 
-      {/* Member table */}
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
-        <div className="p-4 border-b border-border">
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
+        <div className="border-b border-border p-4">
           <Input
-            icon={<Search className="w-4 h-4" />}
-            placeholder="Search by name…"
+            icon={<Search className="h-4 w-4" />}
+            placeholder="Search by name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
+            className="w-full sm:max-w-xs"
           />
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-4 md:hidden">
+          {membersLoading
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="space-y-3 rounded-xl border border-border bg-white p-4"
+                >
+                  <Skeleton className="h-5 w-40" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="col-span-2 h-10 w-full" />
+                  </div>
+                </div>
+              ))
+            : filtered.map((member) => (
+                <MemberCard key={member.member_id} member={member} />
+              ))}
+          {!membersLoading && filtered.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+              No members found.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
@@ -128,28 +277,53 @@ export default function MembersPage() {
                   "Periods Paid",
                   "Last Payment",
                   "Risk",
-                ].map((h) => (
+                ].map((heading) => (
                   <th
-                    key={h}
-                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    key={heading}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
                   >
-                    {h}
+                    {heading}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {membersLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <Skeleton className="h-4 w-24" />
+              {membersLoading
+                ? Array.from({ length: 5 }).map((_, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {Array.from({ length: 6 }).map((_, cellIndex) => (
+                        <td key={cellIndex} className="px-4 py-3">
+                          <Skeleton className="h-4 w-24" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                : filtered.map((member) => (
+                    <tr
+                      key={String(member.member_id)}
+                      className="transition-colors hover:bg-muted/30"
+                    >
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {member.full_name}
                       </td>
-                    ))}
-                  </tr>
-                ))
-              ) : filtered.length === 0 ? (
+                      <td className="px-4 py-3 capitalize text-muted-foreground">
+                        {member.role}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {formatNaira(member.total_contributed)}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {member.periods_paid}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {member.last_paid_at ? formatDate(member.last_paid_at) : "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <RiskBadge level={member.risk_level} />
+                      </td>
+                    </tr>
+                  ))}
+              {!membersLoading && filtered.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -158,44 +332,16 @@ export default function MembersPage() {
                     No members found.
                   </td>
                 </tr>
-              ) : (
-                filtered.map((m) => (
-                  <tr
-                    key={String(m.member_id)}
-                    className="hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {m.full_name}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground capitalize">
-                      {m.role}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatNaira(m.total_contributed)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {m.periods_paid}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {m.last_paid_at ? formatDate(m.last_paid_at) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <RiskBadge level={m.risk_level} />
-                    </td>
-                  </tr>
-                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Join codes panel */}
-      <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+      <div className="space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5">
         <h2 className="text-base font-medium text-foreground">Join Codes</h2>
 
-        {/* Generation form */}
-        <div className="flex items-end gap-3 flex-wrap">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           <Input
             label="Number of codes"
             type="number"
@@ -203,7 +349,7 @@ export default function MembersPage() {
             max="50"
             value={count}
             onChange={(e) => setCount(e.target.value)}
-            className="w-32"
+            className="w-full sm:w-32"
           />
           <Input
             label="Expiry (days)"
@@ -212,18 +358,21 @@ export default function MembersPage() {
             max="365"
             value={expiry}
             onChange={(e) => setExpiry(e.target.value)}
-            className="w-32"
+            className="w-full sm:w-32"
           />
-          <Button onClick={handleGenerateCodes} loading={generating}>
+          <Button
+            onClick={handleGenerateCodes}
+            loading={generating}
+            className="w-full sm:w-auto"
+          >
             Generate
           </Button>
         </div>
 
-        {/* Active codes table */}
         {codesLoading ? (
           <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-10 w-full" />
             ))}
           </div>
         ) : activeCodes.length === 0 ? (
@@ -231,62 +380,70 @@ export default function MembersPage() {
             No active join codes. Generate some above.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  {["Code", "Type", "Expires", ""].map((h) => (
-                    <th
-                      key={h}
-                      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {activeCodes.map((jc) => (
-                  <tr
-                    key={jc.code}
-                    className="hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <code className="font-mono text-sm text-foreground">
-                          {jc.code}
-                        </code>
-                        <CopyButton text={jc.code} />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          jc.role === "exco"
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-blue-100 text-blue-700"
-                        }`}
+          <>
+            <div className="space-y-3 md:hidden">
+              {activeCodes.map((joinCode) => (
+                <JoinCodeCard
+                  key={joinCode.code}
+                  code={joinCode.code}
+                  expiresAt={joinCode.expires_at}
+                  role={joinCode.role}
+                  revoking={revokingCode === joinCode.code}
+                  onRevoke={() => handleRevoke(joinCode.code)}
+                />
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    {["Code", "Type", "Expires", ""].map((heading) => (
+                      <th
+                        key={heading}
+                        className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
                       >
-                        {jc.role === "exco" ? "👑 Exco" : "Member"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                      {formatDate(jc.expires_at)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <button
-                        onClick={() => handleRevoke(jc.code)}
-                        disabled={revokingCode === jc.code}
-                        className="text-xs font-medium text-destructive hover:text-destructive/80 transition-colors disabled:opacity-50"
-                      >
-                        {revokingCode === jc.code ? "Revoking…" : "Revoke"}
-                      </button>
-                    </td>
+                        {heading}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {activeCodes.map((joinCode) => (
+                    <tr
+                      key={joinCode.code}
+                      className="transition-colors hover:bg-muted/30"
+                    >
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <code className="font-mono text-sm text-foreground">
+                            {joinCode.code}
+                          </code>
+                          <CopyButton text={joinCode.code} />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <JoinCodeRoleBadge role={joinCode.role} />
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                        {formatDate(joinCode.expires_at)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRevoke(joinCode.code)}
+                          disabled={revokingCode === joinCode.code}
+                          className="text-xs font-medium text-destructive transition-colors hover:text-destructive/80 disabled:opacity-50"
+                        >
+                          {revokingCode === joinCode.code ? "Revoking..." : "Revoke"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

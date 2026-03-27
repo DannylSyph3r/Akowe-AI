@@ -8,6 +8,7 @@ import { useCoop } from "@/context/CoopContext";
 import { getMembers, broadcastMessage } from "@/lib/api/cooperatives";
 import { Button } from "@/components/ui/Button";
 import { StepUpModal } from "@/components/modals/StepUpModal";
+import type { ApiError } from "@/lib/api/client";
 
 export default function BroadcastPage() {
   const { activeCoop } = useCoop();
@@ -41,18 +42,19 @@ export default function BroadcastPage() {
       );
       toast.success(`Message sent to ${result.sent_to} member(s)`);
       setMessage("");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Broadcast failed");
+    } catch (err) {
+      const apiError = err as ApiError;
+      toast.error(apiError.response?.data?.message ?? "Broadcast failed");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-3xl space-y-5 sm:space-y-6">
       <h1 className="text-xl font-semibold text-foreground">Broadcast</h1>
 
-      <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+      <div className="space-y-4 rounded-xl border border-border bg-white p-4 sm:p-6">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-foreground">Message</label>
           <textarea
@@ -71,7 +73,7 @@ export default function BroadcastPage() {
           </p>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
               {members.length}
@@ -82,6 +84,7 @@ export default function BroadcastPage() {
             onClick={handleSend}
             loading={submitting}
             disabled={!message.trim()}
+            className="w-full sm:w-auto"
           >
             <Radio className="w-4 h-4" />
             Send Broadcast
