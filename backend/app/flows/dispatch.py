@@ -62,6 +62,7 @@ async def send_exco_main_menu(
             "title": "Admin Actions",
             "rows": [
                 {"id": "coop_status", "title": "📈 Coop Status"},
+                {"id": "view_members", "title": "👥 View Members"},
                 {"id": "member_lookup", "title": "🔍 Member Lookup"},
                 {"id": "broadcast", "title": "📢 Broadcast Message"},
                 {"id": "ai_summary", "title": "🤖 AI Summary"},
@@ -119,6 +120,7 @@ async def dispatch_intent(
         handle_coop_summary_intent,
         handle_member_lookup_flow,
         handle_send_reminders_intent,
+        handle_view_members_flow,
     )
     from app.flows.member_flows import (
         handle_add_period,
@@ -292,6 +294,28 @@ async def dispatch_intent(
                 await handle_coop_summary_intent(phone, member, coop_id, db)
         else:
             await _permission_denied(phone)
+
+    elif intent == Intent.VIEW_MEMBERS:
+        if not is_exco:
+            await _permission_denied(phone)
+            return
+        await handle_view_members_flow(phone, session, coop_id, db, page=0)
+
+    elif intent == Intent.MEMBERS_NEXT:
+        if not is_exco:
+            await _permission_denied(phone)
+            return
+        current_page = session.flow_data.get("members_page", 0)
+        await handle_view_members_flow(phone, session, coop_id, db, page=current_page + 1)
+
+    elif intent == Intent.MEMBERS_PREV:
+        if not is_exco:
+            await _permission_denied(phone)
+            return
+        current_page = session.flow_data.get("members_page", 0)
+        await handle_view_members_flow(
+            phone, session, coop_id, db, page=max(0, current_page - 1)
+        )
 
     elif (
         intent == Intent.BROADCAST

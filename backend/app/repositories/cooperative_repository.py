@@ -399,6 +399,37 @@ class CooperativeRepository:
             for row in rows
         ]
 
+    async def list_members_simple(
+        self, coop_id: UUID, offset: int, limit: int
+    ) -> dict:
+        """
+        Lightweight paginated member list for WhatsApp display.
+        Returns full_name and role only, sorted alphabetically by name.
+        Includes total member count for pagination arithmetic.
+        """
+        from app.models.member import Member as MemberModel
+
+        count_result = await self.db.execute(
+            select(func.count(CoopMember.id)).where(
+                CoopMember.cooperative_id == coop_id
+            )
+        )
+        total = count_result.scalar_one()
+
+        result = await self.db.execute(
+            select(MemberModel.full_name, CoopMember.role)
+            .join(CoopMember, CoopMember.member_id == MemberModel.id)
+            .where(CoopMember.cooperative_id == coop_id)
+            .order_by(MemberModel.full_name)
+            .offset(offset)
+            .limit(limit)
+        )
+        members = [
+            {"full_name": row.full_name, "role": row.role}
+            for row in result.all()
+        ]
+        return {"total": total, "members": members}
+
     async def get_financial_summary(
         self, coop_id: UUID, days: int = 30
     ) -> dict:
