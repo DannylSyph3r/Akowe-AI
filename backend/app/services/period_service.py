@@ -50,10 +50,12 @@ class PeriodService:
 
     async def close_period_and_create_next(
         self, period: ContributionPeriod
-    ) -> ContributionPeriod:
+    ) -> tuple[ContributionPeriod, list[UUID]]:
         """
         Close the given period, open the next one, and pre-generate contribution
         records for all members who had joined by the new period's start date.
+        Returns the new period and the list of member_ids for whom contributions
+        were created (used by the caller to schedule reminders).
         """
         await self.period_repo.close(period.id)
 
@@ -82,7 +84,43 @@ class PeriodService:
         ])
 
         await self.db.commit()
-        return next_period
+
+        member_ids = [cm.member_id for cm in active_members]
+        return next_period, member_ids
+
+    async def close_overdue_periods(self) -> dict:
+        """
+        Find all contribution periods whose due_date has passed and are still open,
+        close each one, create the next period, and schedule reminders for new members.
+        Returns a dict with the count of periods closed and created.
+        """
+        from datetime import date as _date
+        from app.services.reminder_service import ReminderService
+
+        today = _date.today()
+
+        result = await self.db.execute(
+            select(ContributionPeriod).where(
+                ContributionPeriod.due_date <= today,
+                ContributionPeriod.closed_at.is_(None),
+            )
+        )
+        overdue_periods = result.scalars().all()
+
+        if not overdue_periods:
+            return {"closed": 0, "created": 0}
+
+        reminder_service = ReminderService(self.db)
+        closed_count = 0
+        created_count = 0
+
+        for period in overdue_periods:
+            next_period, member_ids = await self.close_period_and_create_next(period)
+            await reminder_service.schedule_reminders_for_period(next_period, member_ids)
+            closed_count += 1
+            created_count += 1
+
+        return {"closed": closed_count, "created": created_count}
 
     async def generate_future_periods(
         self, coop_id: UUID, count: int
