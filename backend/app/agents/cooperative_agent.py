@@ -10,8 +10,7 @@ import json
 import logging
 from uuid import UUID
 
-from google.adk.agents import Agent
-from google.adk.tools import tool
+from google.adk.agents import LlmAgent
 from sqlalchemy import text
 
 from app.prompts.chatbot_agent import format_chatbot_prompt
@@ -19,7 +18,6 @@ from app.prompts.chatbot_agent import format_chatbot_prompt
 logger = logging.getLogger("akoweai")
 
 
-@tool
 def query_cooperative_data(sql: str) -> str:
     """
     Execute a read-only SQL SELECT against the cooperative database.
@@ -31,7 +29,6 @@ def query_cooperative_data(sql: str) -> str:
     if readonly_engine is None:
         return "ERROR: Read-only database is not configured. Ask your administrator to set READONLY_DATABASE_URL."
 
-    # Enforce LIMIT 200
     normalized = sql.strip().rstrip(";")
     if "limit" not in normalized.lower():
         normalized = f"{normalized} LIMIT 200"
@@ -46,13 +43,13 @@ def query_cooperative_data(sql: str) -> str:
         return f"ERROR: Query failed — {exc}"
 
 
-def create_cooperative_agent(coop_id: UUID) -> Agent:
+def create_cooperative_agent(coop_id: UUID) -> LlmAgent:
     """
-    Instantiate an ADK Agent scoped to the given cooperative.
+    Instantiate an LlmAgent scoped to the given cooperative.
     The coop_id is baked into the system prompt — it cannot be overridden
     by user input at runtime.
     """
-    return Agent(
+    return LlmAgent(
         name="cooperative_advisor",
         model="gemini-3.1-pro-preview",
         instruction=format_chatbot_prompt(str(coop_id)),
