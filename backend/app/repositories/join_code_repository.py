@@ -45,3 +45,31 @@ class JoinCodeRepository:
             select(JoinCode).where(JoinCode.id == join_code_id)
         )
         return result.scalar_one()
+
+    async def list_active_by_coop(self, coop_id: UUID) -> list[JoinCode]:
+
+        now = datetime.now(timezone.utc)
+        result = await self.db.execute(
+            select(JoinCode)
+            .where(
+                JoinCode.cooperative_id == coop_id,
+                JoinCode.redeemed_at.is_(None),
+                JoinCode.expires_at > now,
+            )
+            .order_by(JoinCode.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def revoke_by_code(self, coop_id: UUID, code: str) -> int:
+
+        now = datetime.now(timezone.utc)
+        result = await self.db.execute(
+            update(JoinCode)
+            .where(
+                JoinCode.code == code,
+                JoinCode.cooperative_id == coop_id,
+                JoinCode.redeemed_at.is_(None),
+            )
+            .values(expires_at=now)
+        )
+        return result.rowcount

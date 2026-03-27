@@ -18,6 +18,8 @@ from app.repositories.cooperative_repository import CooperativeRepository
 from app.prompts.financial_summary import COOP_STATUS_INSIGHT_PROMPT
 from app.repositories.period_repository import PeriodRepository
 from app.schemas.cooperative import (
+    ActiveJoinCodeItem,
+    ActiveJoinCodesResponse,
     CooperativeDetailResponse,
     CooperativeListItem,
     CreateCooperativeRequest,
@@ -181,6 +183,39 @@ async def generate_exco_invite(
         message="Exco invite generated",
         status_code=201,
     )
+    
+
+@router.get("/{coop_id}/join-codes")
+async def list_join_codes(
+    coop_id: UUID,
+    _exco=Depends(require_coop_exco),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse:
+    codes = await JoinCodeService(db).list_active(coop_id)
+    return ApiResponse.success(
+        data=ActiveJoinCodesResponse(
+            codes=[
+                ActiveJoinCodeItem(
+                    code=jc.code,
+                    role=jc.role,
+                    expires_at=jc.expires_at,
+                    created_at=jc.created_at,
+                )
+                for jc in codes
+            ]
+        ),
+        message="OK",
+    )
+
+
+@router.delete("/{coop_id}/join-codes/{code}", status_code=204)
+async def revoke_join_code(
+    coop_id: UUID,
+    code: str,
+    _exco=Depends(require_coop_exco),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await JoinCodeService(db).revoke(coop_id, code)
 
 
 @router.get("/{coop_id}/periods/payable")

@@ -73,6 +73,21 @@ class JoinCodeService:
         await self.db.commit()
         return invite
 
+    async def list_active(self, coop_id: UUID) -> list[JoinCode]:
+        """Return all active (unredeemed, unexpired) codes for the cooperative."""
+        return await self.repo.list_active_by_coop(coop_id)
+
+    async def revoke(self, coop_id: UUID, code: str) -> None:
+        """
+        Revoke a join code by immediately expiring it.
+        Raises NotFoundException if the code doesn't exist, is already redeemed,
+        or has already expired.
+        """
+        rows_affected = await self.repo.revoke_by_code(coop_id, code)
+        if rows_affected == 0:
+            raise NotFoundException("Join code not found or already used/expired")
+        await self.db.commit()
+
     async def validate_and_redeem(
         self, code: str, member_id: UUID
     ) -> JoinCode:
