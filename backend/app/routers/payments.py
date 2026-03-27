@@ -194,7 +194,7 @@ _COMPLETION_HTML_TEMPLATE = """<!DOCTYPE html>
             var closeMsg = document.getElementById('close-msg');
 
             if (isMobile) {{
-                btn.href = 'whatsapp://';
+                btn.href = 'https://wa.me/';
                 btn.textContent = '\u2190 Back to WhatsApp';
             }} else {{
                 btn.textContent = 'Close this tab';
