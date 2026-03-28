@@ -141,8 +141,9 @@ export interface WithdrawalItem {
 
 export interface PaginatedWithdrawals {
   items: WithdrawalItem[];
+  total: number;
   page: number;
-  page_size: number;
+  has_more: boolean;
 }
 
 export interface RecordWithdrawalRequest {

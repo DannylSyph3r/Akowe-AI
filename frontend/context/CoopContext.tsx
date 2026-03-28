@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listCooperatives } from "@/lib/api/cooperatives";
+import { getAccessToken } from "@/lib/api/auth";
 import type { CooperativeListItem } from "@/lib/api/types";
 
 interface CoopContextType {
@@ -30,6 +31,7 @@ export function CoopProvider({ children }: { children: React.ReactNode }) {
     queryKey: ["cooperatives"],
     queryFn: listCooperatives,
     staleTime: 60_000,
+    enabled: !!getAccessToken(),
   });
 
   // Restore saved selection or fall back to first coop
