@@ -274,6 +274,16 @@ async def dispatch_intent(
         else:
             await send_member_main_menu(phone)
 
+    elif intent == Intent.GREETING:
+        await send_text_message(
+            phone,
+            "Hey there! 👋 Great to hear from you.\n\nUse the menu below to pay contributions, check your balance, or manage your cooperative.",
+        )
+        if is_exco:
+            await send_exco_main_menu(phone, "")
+        else:
+            await send_member_main_menu(phone)
+
     else:
         from app.services.intent_service import send_fallback_menu
         await send_fallback_menu(phone, coop_member_role)
