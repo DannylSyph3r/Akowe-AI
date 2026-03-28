@@ -100,8 +100,8 @@ class CooperativeRepository:
 
     async def get_members_with_stats(self, coop_id: UUID) -> list[dict]:
         """
-        Single query: all coop members with total contributions, last payment
-        date, and a late_count derived from the last 3 closed periods.
+        Single query: all coop members with total contributions, periods paid,
+        last payment date, and a late_count derived from the last 3 closed periods.
         The caller maps late_count → RiskLevel.
         """
         stmt = text("""
@@ -117,7 +117,8 @@ class CooperativeRepository:
                 SELECT
                     c.member_id,
                     SUM(CASE WHEN c.status = 'paid' THEN c.amount ELSE 0 END) AS total_contributed,
-                    MAX(c.paid_at) AS last_paid_at
+                    COUNT(CASE WHEN c.status = 'paid' THEN 1 END)             AS periods_paid,
+                    MAX(c.paid_at)                                             AS last_paid_at
                 FROM contributions c
                 WHERE c.cooperative_id = :coop_id
                 GROUP BY c.member_id
@@ -140,6 +141,7 @@ class CooperativeRepository:
                 cm.role,
                 cm.joined_at,
                 COALESCE(ms.total_contributed, 0) AS total_contributed,
+                COALESCE(ms.periods_paid, 0)      AS periods_paid,
                 ms.last_paid_at,
                 COALESCE(mr.late_count, 0)        AS late_count
             FROM coop_members cm
@@ -150,6 +152,152 @@ class CooperativeRepository:
             ORDER BY cm.joined_at
         """)
         result = await self.db.execute(stmt, {"coop_id": coop_id})
+        return [dict(row._mapping) for row in result.fetchall()]
+
+    async def get_overview_stats(self, coop_id: UUID) -> dict:
+        """
+        Returns collection_rate_pct for the current open period and
+        ytd_collected_kobo (contributions paid since Jan 1 of the current year).
+        """
+        from datetime import date, datetime, timezone
+        from app.models.contribution import Contribution
+        from app.models.contribution_period import ContributionPeriod
+
+        today = date.today()
+        jan_first = datetime(today.year, 1, 1, tzinfo=timezone.utc)
+
+        # YTD: sum of paid contributions this calendar year
+        ytd_result = await self.db.execute(
+            select(func.coalesce(func.sum(Contribution.amount), 0)).where(
+                and_(
+                    Contribution.cooperative_id == coop_id,
+                    Contribution.status == "paid",
+                    Contribution.paid_at >= jan_first,
+                )
+            )
+        )
+        ytd_collected_kobo = ytd_result.scalar_one() or 0
+
+        # Collection rate: open period paid / total
+        open_period_result = await self.db.execute(
+            select(ContributionPeriod.id).where(
+                and_(
+                    ContributionPeriod.cooperative_id == coop_id,
+                    ContributionPeriod.closed_at.is_(None),
+                )
+            ).order_by(ContributionPeriod.period_number.desc()).limit(1)
+        )
+        open_period_id = open_period_result.scalar_one_or_none()
+
+        collection_rate_pct = 0.0
+        if open_period_id:
+            counts_result = await self.db.execute(
+                select(
+                    func.count(Contribution.id).label("total"),
+                    func.count(Contribution.id).filter(
+                        Contribution.status == "paid"
+                    ).label("paid"),
+                ).where(
+                    and_(
+                        Contribution.cooperative_id == coop_id,
+                        Contribution.period_id == open_period_id,
+                    )
+                )
+            )
+            row = counts_result.one()
+            if row.total > 0:
+                collection_rate_pct = round(row.paid / row.total * 100, 1)
+
+        return {
+            "ytd_collected_kobo": ytd_collected_kobo,
+            "collection_rate_pct": collection_rate_pct,
+        }
+
+    async def get_contributions_summary(self, coop_id: UUID) -> list[dict]:
+        """
+        Per-member contribution leaderboard for the exco dashboard.
+        Returns: member_id, full_name, total_contributed, periods_paid,
+                 periods_total (member's assigned periods), last_payment_date, late_count.
+        Sorted by total_contributed DESC.
+        """
+        stmt = text("""
+            WITH last_3_periods AS (
+                SELECT id, due_date
+                FROM contribution_periods
+                WHERE cooperative_id = :coop_id
+                  AND closed_at IS NOT NULL
+                ORDER BY period_number DESC
+                LIMIT 3
+            ),
+            member_stats AS (
+                SELECT
+                    c.member_id,
+                    SUM(CASE WHEN c.status = 'paid' THEN c.amount ELSE 0 END) AS total_contributed,
+                    COUNT(*)                                                    AS periods_total,
+                    COUNT(CASE WHEN c.status = 'paid' THEN 1 END)             AS periods_paid,
+                    MAX(c.paid_at)                                             AS last_payment_date
+                FROM contributions c
+                WHERE c.cooperative_id = :coop_id
+                GROUP BY c.member_id
+            ),
+            member_risk AS (
+                SELECT
+                    c.member_id,
+                    COUNT(*) FILTER (
+                        WHERE c.status = 'unpaid'
+                           OR (c.status = 'paid' AND c.paid_at > p.due_date)
+                    ) AS late_count
+                FROM contributions c
+                JOIN last_3_periods p ON c.period_id = p.id
+                WHERE c.cooperative_id = :coop_id
+                GROUP BY c.member_id
+            )
+            SELECT
+                m.id          AS member_id,
+                m.full_name,
+                COALESCE(ms.total_contributed, 0)  AS total_contributed,
+                COALESCE(ms.periods_total, 0)       AS periods_total,
+                COALESCE(ms.periods_paid, 0)        AS periods_paid,
+                ms.last_payment_date,
+                COALESCE(mr.late_count, 0)          AS late_count
+            FROM coop_members cm
+            JOIN members m ON cm.member_id = m.id
+            LEFT JOIN member_stats ms ON cm.member_id = ms.member_id
+            LEFT JOIN member_risk  mr ON cm.member_id = mr.member_id
+            WHERE cm.cooperative_id = :coop_id
+            ORDER BY total_contributed DESC
+        """)
+        result = await self.db.execute(stmt, {"coop_id": coop_id})
+        return [dict(row._mapping) for row in result.fetchall()]
+
+    async def get_period_contributions_status(
+        self, coop_id: UUID, period_id: UUID
+    ) -> list[dict]:
+        """
+        Snapshot of each member's payment status for a specific period.
+        Returns: member_id, full_name, amount, status.
+        Paid members appear first, then unpaid alphabetically.
+        """
+        stmt = text("""
+            SELECT
+                m.id     AS member_id,
+                m.full_name,
+                COALESCE(c.amount, 0) AS amount,
+                COALESCE(c.status, 'unpaid') AS status
+            FROM coop_members cm
+            JOIN members m ON cm.member_id = m.id
+            LEFT JOIN contributions c
+                ON c.member_id = cm.member_id
+               AND c.cooperative_id = :coop_id
+               AND c.period_id = :period_id
+            WHERE cm.cooperative_id = :coop_id
+            ORDER BY
+                CASE WHEN COALESCE(c.status, 'unpaid') = 'paid' THEN 0 ELSE 1 END,
+                m.full_name
+        """)
+        result = await self.db.execute(
+            stmt, {"coop_id": coop_id, "period_id": period_id}
+        )
         return [dict(row._mapping) for row in result.fetchall()]
 
     async def get_paid_count_for_period(

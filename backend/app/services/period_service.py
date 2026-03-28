@@ -232,3 +232,18 @@ class PeriodService:
             })
 
         return result
+
+    async def get_all_periods(self, coop_id: UUID) -> list[dict]:
+        """All persisted periods for the coop, for the history filter dropdown."""
+        periods = await self.period_repo.get_all_periods(coop_id)
+        return [
+            {
+                "id": p.id,
+                "period_number": p.period_number,
+                "label": p.start_date.strftime("%B %Y"),
+                "start_date": p.start_date,
+                "due_date": p.due_date,
+                "is_open": p.closed_at is None,
+            }
+            for p in periods
+        ]
