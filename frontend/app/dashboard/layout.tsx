@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { CoopProvider, useCoop } from "@/context/CoopContext";
@@ -9,6 +9,7 @@ import { getAccessToken } from "@/lib/api/auth";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { allCoops, isLoading } = useCoop();
 
   useEffect(() => {
@@ -18,10 +19,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    if (!isLoading && allCoops.length === 0) {
+    if (!isLoading && allCoops.length === 0 && pathname !== "/dashboard/setup") {
       router.replace("/dashboard/setup");
     }
-  }, [isLoading, allCoops, router]);
+  }, [isLoading, allCoops, router, pathname]);
 
   if (isLoading) {
     return (

@@ -35,7 +35,7 @@ export interface CooperativeListItem {
   name: string;
   role: "member" | "exco";
   contribution_amount_kobo: number;
-  member_count: number;
+  pool_balance: number;
 }
 
 export interface CooperativeDetail {

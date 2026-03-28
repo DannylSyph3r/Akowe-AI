@@ -13,11 +13,11 @@ import { StepUpModal } from "@/components/modals/StepUpModal";
 const FREQUENCY_OPTIONS = [
   { value: "weekly", label: "Weekly" },
   { value: "biweekly", label: "Bi-weekly" },
+  { value: "triweekly", label: "Tri-weekly" },
   { value: "monthly", label: "Monthly" },
   { value: "bimonthly", label: "Bi-monthly" },
   { value: "quarterly", label: "Quarterly" },
-  { value: "biannual", label: "Bi-annual" },
-  { value: "annual", label: "Annual" },
+  { value: "yearly", label: "Yearly" },
 ];
 
 export default function SettingsPage() {
@@ -47,6 +47,20 @@ export default function SettingsPage() {
       dueDayOffset: String(coop.current_schedule.due_day_offset),
     });
   }, [coop]);
+
+  const handleOpenStepUp = () => {
+    const amountKobo = Math.round(parseFloat(form.contributionAmountNaira) * 100);
+    if (!amountKobo || amountKobo <= 0) {
+      toast.error("Enter a valid contribution amount");
+      return;
+    }
+    const offset = parseInt(form.dueDayOffset, 10);
+    if (isNaN(offset) || offset < 0 || offset > 60) {
+      toast.error("Enter a valid due day offset (0-60)");
+      return;
+    }
+    setStepUpOpen(true);
+  };
 
   const handleAuthorized = async (stepUpToken: string) => {
     setSubmitting(true);
@@ -125,7 +139,7 @@ export default function SettingsPage() {
           }
         />
         <Button
-          onClick={() => setStepUpOpen(true)}
+          onClick={handleOpenStepUp}
           loading={submitting}
           className="w-full"
         >
