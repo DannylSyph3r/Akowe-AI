@@ -60,7 +60,7 @@ class GeminiProClient:
 
     def __init__(self):
         self._client = genai.Client(api_key=settings.gemini_api_key)
-        self._model = "gemini-3.1-pro-preview"
+        self._model = "gemini-3-flash-preview"
 
     def _summarise_sync(self, context: str, system_prompt: str) -> str:
         try:
