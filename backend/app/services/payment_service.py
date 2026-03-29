@@ -19,38 +19,6 @@ from app.services.reminder_service import ReminderService
 settings = get_settings()
 logger = logging.getLogger("akoweai")
 
-# Interswitch OAuth token cache (in-process, single-instance safe)
-_token_cache: dict = {"token": None, "expires_at": 0.0}  # expires_at is unix timestamp
-
-
-async def _get_interswitch_token() -> str:
-    """
-    Return a valid Interswitch OAuth2 Bearer token.
-    Fetches a new one only when the cached token is within 30s of expiry.
-    """
-    now = time.time()
-    if _token_cache["token"] and _token_cache["expires_at"] > now + 30:
-        return _token_cache["token"]
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(
-            settings.interswitch_auth_url,
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            auth=(settings.interswitch_client_id, settings.interswitch_secret_key),
-        )
-        response.raise_for_status()
-        data = response.json()
-
-    token = data["access_token"]
-    expires_in = int(data.get("expires_in", 3600))
-
-    _token_cache["token"] = token
-    _token_cache["expires_at"] = time.time() + expires_in
-
-    return token
-
 
 def generate_transaction_reference() -> str:
     """Generate a unique payment reference: AKOWE-{timestamp_ms}-{6 hex chars}."""
@@ -121,25 +89,17 @@ class PaymentService:
     ) -> dict:
         """
         Query Interswitch for authoritative transaction status.
-        Uses v2 API — reference is appended as a query param, Bearer token required.
+        Uses v1 API — no authentication required.
+        Query params are lowercase per the v1 spec.
         """
-        try:
-            token = await _get_interswitch_token()
-        except Exception as e:
-            logger.error("Failed to obtain Interswitch token: %s", e)
-            raise
-
-        url = f"{settings.interswitch_query_url}?transactionReference={reference}"
+        params = {
+            "merchantcode": settings.interswitch_merchant_code,
+            "transactionreference": reference,
+            "amount": amount_kobo,
+        }
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(
-                url,
-                headers={
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {token}",
-                },
-            )
+            response = await client.get(settings.interswitch_query_url, params=params)
             response.raise_for_status()
             return response.json()
 
@@ -172,9 +132,15 @@ def verify_interswitch_webhook_signature(raw_body: bytes, signature_header: str)
     """
     Verify X-Interswitch-Signature.
     Interswitch uses HMAC-SHA512 of the raw JSON body, hex-encoded.
+    Fails closed if INTERSWITCH_WEBHOOK_SECRET is not configured.
     """
+    if not settings.interswitch_webhook_secret:
+        logger.error(
+            "INTERSWITCH_WEBHOOK_SECRET is not configured — rejecting webhook request"
+        )
+        return False
     expected = hmac.new(
-        settings.interswitch_secret_key.encode(),
+        settings.interswitch_webhook_secret.encode(),
         raw_body,
         hashlib.sha512,
     ).hexdigest()

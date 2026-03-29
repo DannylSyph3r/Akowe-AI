@@ -2,7 +2,7 @@ import json
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -11,6 +11,7 @@ from app.core.dependencies import get_current_member
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.responses import ApiResponse
 from app.models.member import Member
+from app.repositories.cooperative_repository import CooperativeRepository
 from app.repositories.member_repository import MemberRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.services.payment_service import (
@@ -50,32 +51,165 @@ _INITIATE_FORM_TEMPLATE = """<!DOCTYPE html>
 </body>
 </html>"""
 
-_COMPLETION_HTML = """<!DOCTYPE html>
+_COMPLETION_HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AkoweAI — Payment Received</title>
+    <title>AkoweAI \u2014 Payment Received</title>
     <style>
-        body {{ font-family: sans-serif; display: flex; justify-content: center;
-               align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }}
-        .card {{ background: white; border-radius: 12px; padding: 32px; text-align: center;
-                 max-width: 380px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
-        .emoji {{ font-size: 48px; margin-bottom: 16px; }}
-        h1 {{ color: #1a1a1a; font-size: 22px; margin-bottom: 8px; }}
-        p {{ color: #666; margin-bottom: 24px; line-height: 1.5; }}
-        a {{ display: inline-block; background: #25D366; color: white;
-             text-decoration: none; padding: 12px 28px; border-radius: 8px;
-             font-weight: 600; font-size: 16px; }}
+        *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f0f4f8;
+            padding: 24px;
+        }}
+        .card {{
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 40px 32px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }}
+        .check-circle {{
+            width: 64px;
+            height: 64px;
+            background: #e8f9f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }}
+        .check-circle svg {{
+            width: 32px;
+            height: 32px;
+        }}
+        .brand {{
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #25D366;
+            margin-bottom: 12px;
+        }}
+        h1 {{
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 10px;
+        }}
+        .subtitle {{
+            font-size: 15px;
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 28px;
+        }}
+        .ref-box {{
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 28px;
+            text-align: left;
+        }}
+        .ref-label {{
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #9ca3af;
+            margin-bottom: 4px;
+        }}
+        .ref-value {{
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }}
+        .action-btn {{
+            display: block;
+            width: 100%;
+            background: #25D366;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background 0.15s ease;
+        }}
+        .action-btn:hover {{ background: #1ebe5d; }}
+        .close-msg {{
+            display: none;
+            margin-top: 16px;
+            font-size: 14px;
+            color: #6b7280;
+        }}
+        .footer {{
+            margin-top: 24px;
+            font-size: 12px;
+            color: #9ca3af;
+        }}
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="emoji">✅</div>
+        <div class="check-circle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </div>
+        <div class="brand">AkoweAI</div>
         <h1>Payment Received</h1>
-        <p>Your receipt is being prepared.<br>You will receive a WhatsApp message shortly.</p>
-        <a href="whatsapp://">← Return to WhatsApp</a>
+        <p class="subtitle">
+            Your receipt is being prepared.<br>
+            Check WhatsApp for confirmation.
+        </p>
+        <div class="ref-box">
+            <div class="ref-label">Transaction Reference</div>
+            <div class="ref-value">{txnref}</div>
+        </div>
+        <a id="action-btn" class="action-btn" href="#">Loading&hellip;</a>
+        <p id="close-msg" class="close-msg">You may now close this tab.</p>
+        <div class="footer">Powered by AkoweAI &middot; Secured by Interswitch</div>
     </div>
+    <script>
+        (function () {{
+            var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                navigator.userAgent
+            );
+            var btn = document.getElementById('action-btn');
+            var closeMsg = document.getElementById('close-msg');
+
+            if (isMobile) {{
+                btn.href = 'whatsapp://';
+                btn.textContent = '\u2190 Back to WhatsApp';
+            }} else {{
+                btn.textContent = 'Close this tab';
+                btn.addEventListener('click', function (e) {{
+                    e.preventDefault();
+                    window.close();
+                    // If window.close() was blocked, surface the fallback message
+                    setTimeout(function () {{
+                        btn.style.display = 'none';
+                        closeMsg.style.display = 'block';
+                    }}, 300);
+                }});
+            }}
+        }})();
+    </script>
 </body>
 </html>"""
 
@@ -205,7 +339,13 @@ async def payment_initiate(
 
     member_repo = MemberRepository(db)
     member = await member_repo.get_by_id(transaction.member_id)
-    cust_name = member.full_name if member else "Member"
+
+    coop_repo = CooperativeRepository(db)
+    coop = await coop_repo.get_by_id(transaction.cooperative_id)
+
+    member_name = member.full_name if member else "Member"
+    coop_name = coop.name if coop else "Cooperative"
+    cust_name = f"{member_name} - {coop_name}"
 
     html = _INITIATE_FORM_TEMPLATE.format(
         action_url=f"{settings.interswitch_base_url}/collections/w/pay",
@@ -241,30 +381,32 @@ async def payment_redirect(
     if txnref:
         background_tasks.add_task(_verify_and_process_payment, txnref, amount)
 
-    return HTMLResponse(content=_COMPLETION_HTML)
+    return HTMLResponse(
+        content=_COMPLETION_HTML_TEMPLATE.format(txnref=txnref or "\u2014")
+    )
 
 
 @router.post("/webhook")
 async def payment_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
-) -> ApiResponse:
+) -> Response:
     """
     Interswitch webhook endpoint.
     Verifies X-Interswitch-Signature (HMAC-SHA512 of raw body).
-    Always returns 200 to prevent Interswitch retries.
+    Always returns bare 200 — Interswitch discards any response body.
     """
     raw_body = await request.body()
     signature = request.headers.get("X-Interswitch-Signature", "")
 
     if not verify_interswitch_webhook_signature(raw_body, signature):
         logger.warning("Interswitch webhook signature verification failed")
-        return ApiResponse.success(data=None, message="ok")
+        return Response(status_code=200)
 
     try:
         payload = json.loads(raw_body)
     except Exception:
-        return ApiResponse.success(data=None, message="ok")
+        return Response(status_code=200)
 
     event_type = payload.get("event", "")
     if event_type == "TRANSACTION.COMPLETED":
@@ -274,7 +416,7 @@ async def payment_webhook(
         if txnref:
             background_tasks.add_task(_verify_and_process_payment, txnref, amount)
 
-    return ApiResponse.success(data=None, message="ok")
+    return Response(status_code=200)
 
 
 @router.post("/retry")
