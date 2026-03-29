@@ -251,8 +251,8 @@ async def handle_broadcast_flow(
             return
 
         coop_repo = CooperativeRepository(db)
-        total_count = await coop_repo.get_member_count(coop_id)
-        recipient_count = max(0, total_count - 1)
+        member_phones = await coop_repo.get_active_member_phones(coop_id)
+        recipient_count = sum(1 for p, _ in member_phones if p != phone)
         session.flow_data["broadcast_message"] = message_text
         session.current_step = 2
 
