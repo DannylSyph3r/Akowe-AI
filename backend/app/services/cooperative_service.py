@@ -142,8 +142,8 @@ class CooperativeService:
 
         return await self.get_cooperative(coop_id)
 
-    async def broadcast_to_members(self, coop_id: UUID, message: str) -> int:
-        from app.services.whatsapp_service import TEMPLATE_BROADCAST, send_template_message
+    async def broadcast_to_members(self, coop_id: UUID, message: str, exclude_phone: str | None = None) -> int:
+        from app.services.whatsapp_service import TEMPLATE_BROADCAST, sanitize_template_param, send_template_message
 
         coop = await self.coop_repo.get_by_id(coop_id)
         if not coop:
@@ -153,6 +153,8 @@ class CooperativeService:
         sent_count = 0
 
         for phone, _ in member_phones:
+            if exclude_phone and phone == exclude_phone:
+                continue
             try:
                 await send_template_message(
                     to=phone,
@@ -161,8 +163,8 @@ class CooperativeService:
                         {
                             "type": "body",
                             "parameters": [
-                                {"type": "text", "text": coop.name},
-                                {"type": "text", "text": message},
+                                {"type": "text", "text": sanitize_template_param(coop.name)},
+                                {"type": "text", "text": sanitize_template_param(message)},
                             ],
                         }
                     ],

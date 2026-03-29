@@ -355,12 +355,13 @@ async def get_period_status(
 async def broadcast_message(
     coop_id: UUID,
     body: BroadcastRequest,
+    current_member: Member = Depends(get_current_member),
     _exco=Depends(require_coop_exco),
     _step_up=Depends(require_step_up(StepUpAction.BROADCAST)),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     sent_count = await CooperativeService(db).broadcast_to_members(
-        coop_id, body.message
+        coop_id, body.message, exclude_phone=current_member.phone_number
     )
     return ApiResponse.success(
         data=BroadcastResponse(sent_to=sent_count),
