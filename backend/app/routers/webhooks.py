@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import PlainTextResponse
@@ -13,6 +14,28 @@ from app.repositories.member_repository import MemberRepository
 from app.services.intent_service import route_message
 from app.services.session_service import load_or_create_session, save_session
 from app.services.whatsapp_service import send_text_message
+
+
+# In-memory dedup for Meta's duplicate webhook deliveries.
+# Module-level dict is safe for single-instance Railway deployments.
+_processed_message_ids: dict[str, float] = {}
+_DEDUP_TTL_SECONDS = 60.0
+
+
+def _is_duplicate(message_id: str) -> bool:
+    """Return True if this message_id was already processed within the TTL window."""
+    if not message_id:
+        return False
+    now = time.time()
+    # Evict expired entries to prevent unbounded growth
+    stale_keys = [k for k, t in _processed_message_ids.items() if now - t > _DEDUP_TTL_SECONDS]
+    for k in stale_keys:
+        del _processed_message_ids[k]
+    if message_id in _processed_message_ids:
+        return True
+    _processed_message_ids[message_id] = now
+    return False
+
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 settings = get_settings()
@@ -54,7 +77,7 @@ def extract_message_data(payload: dict) -> dict | None:
         phone = msg.get("from", "")
         msg_type = msg.get("type", "")
 
-        result: dict = {"phone": phone, "message_type": msg_type}
+        result: dict = {"phone": phone, "message_type": msg_type, "message_id": msg.get("id", "")}
 
         if msg_type == "text":
             result["text"] = msg.get("text", {}).get("body", "")
@@ -87,6 +110,12 @@ async def _process_whatsapp_message(payload: dict) -> None:
             message_data = extract_message_data(payload)
             if message_data is None:
                 # Silently ignore status updates and non-message events
+                return
+
+            # Deduplicate — Meta sometimes delivers the same webhook twice
+            message_id = message_data.get("message_id", "")
+            if _is_duplicate(message_id):
+                logger.info("Skipping duplicate webhook delivery for message %s", message_id)
                 return
 
             phone = message_data.get("phone", "")

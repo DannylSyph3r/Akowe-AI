@@ -207,7 +207,7 @@ async def dispatch_intent(
     elif intent == Intent.ADD_PERIOD:
         # User wants to add another period to their selection
         if session.current_flow == "PAY_SELECTION":
-            await handle_add_period(phone, session, db)
+            await handle_add_period(phone, member, coop_id, session, db)
         else:
             # No active selection — start fresh pay flow
             await handle_pay_intent(phone, member, session, coop_id, db)
