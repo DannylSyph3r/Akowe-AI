@@ -280,7 +280,6 @@ async def _send_payment_receipt(transaction) -> None:
         if not member:
             return
 
-        from app.repositories.cooperative_repository import CooperativeRepository
         from app.repositories.period_repository import PeriodRepository
 
         coop = await CooperativeRepository(db).get_by_id(transaction.cooperative_id)

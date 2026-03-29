@@ -1,10 +1,8 @@
 import hashlib
 import hmac
-import json
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
 from uuid import UUID
 
 import httpx
@@ -106,7 +104,7 @@ class PaymentService:
     async def is_transaction_already_processed(self, reference: str) -> bool:
         return await self.payment_repo.is_already_paid(reference)
 
-async def process_successful_payment(
+    async def process_successful_payment(
         self, transaction: PendingTransaction
     ) -> None:
         """
