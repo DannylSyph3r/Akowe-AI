@@ -240,12 +240,17 @@ async def dispatch_intent(
             await send_member_main_menu(phone, multi_coop=len(coops) > 1)
 
     elif intent == Intent.PAY:
-        # If we're in PAY_SELECTION and a period row was selected from the list,
-        # entities["row_id"] carries the row identifier
         row_id = entities.get("row_id")
         if session.current_flow == "PAY_SELECTION" and row_id:
+            # Continuing an active selection — period row was tapped
             await handle_pay_period_selected(phone, member, coop_id, row_id, session, db)
         else:
+            # Explicit new pay attempt (e.g. main menu "Pay Now" button).
+            # Reset any stale PAY_SELECTION state so the user starts fresh.
+            if session.current_flow == "PAY_SELECTION":
+                session.current_flow = None
+                session.current_step = 0
+                session.flow_data = {}
             await handle_pay_intent(phone, member, session, coop_id, db)
 
     elif intent == Intent.ADD_PERIOD:

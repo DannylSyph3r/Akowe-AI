@@ -166,12 +166,6 @@ async def handle_pay_intent(
     db: AsyncSession,
 ) -> None:
     """Decide between single-period quick pay and multi-period selection."""
-    # Handle period selection continuation
-    if session.current_flow == "PAY_SELECTION":
-        current_text = session.flow_data.get("current_text", "")
-        # Flow continues via list/button, not free text — shouldn't reach here
-        return
-
     period_svc = PeriodService(db)
     periods = await period_svc.get_payable_periods(coop_id, member.id)
 
