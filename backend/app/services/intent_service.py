@@ -24,6 +24,7 @@ BUTTON_INTENT_MAP: dict[str, Intent] = {
     "confirm_pay": Intent.CONFIRM_PAY,
     "confirm_broadcast": Intent.CONFIRM_BROADCAST,
     "cancel": Intent.CANCEL,
+    "show_switcher": Intent.SHOW_SWITCHER,
 }
 
 # Blocking flows redirect all free text back into the flow

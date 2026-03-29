@@ -21,47 +21,68 @@ from app.services.whatsapp_service import (
 logger = logging.getLogger("akoweai")
 
 
-async def send_member_main_menu(phone: str) -> None:
+async def send_member_main_menu(phone: str, multi_coop: bool = False) -> None:
+    buttons = [
+        {"id": "pay_now", "title": "💰 Pay"},
+        {"id": "my_balance", "title": "📊 My Balance"},
+    ]
+    if multi_coop:
+        buttons.append({"id": "show_switcher", "title": "🔄 Switch Coop"})
     await send_reply_buttons(
         phone,
         "Here's what I can help you with 👇",
-        [
-            {"id": "pay_now", "title": "💰 Pay"},
-            {"id": "my_balance", "title": "📊 My Balance"},
-        ],
+        buttons,
     )
 
 
-async def send_exco_main_menu(phone: str, name: str) -> None:
+async def send_exco_main_menu(
+    phone: str,
+    name: str,
+    coop_name: str = "",
+    multi_coop: bool = False,
+) -> None:
     greeting = (
         f"Hello {name} 👋\nWhat would you like to do?"
         if name
         else "Here's your menu 👇"
     )
+    if coop_name:
+        greeting = f"🏦 *{coop_name}*\n{greeting}"
+
+    sections = [
+        {
+            "title": "Member Actions",
+            "rows": [
+                {"id": "pay_now", "title": "💰 Pay Contribution"},
+                {"id": "my_balance", "title": "📊 My Balance"},
+                {"id": "full_history", "title": "📜 Payment History"},
+            ],
+        },
+        {
+            "title": "Admin Actions",
+            "rows": [
+                {"id": "coop_status", "title": "📈 Coop Status"},
+                {"id": "member_lookup", "title": "🔍 Member Lookup"},
+                {"id": "broadcast", "title": "📢 Broadcast Message"},
+                {"id": "ai_summary", "title": "🤖 AI Summary"},
+            ],
+        },
+    ]
+
+    if multi_coop:
+        sections.append({
+            "title": "Account",
+            "rows": [
+                {"id": "show_switcher", "title": "🔄 Switch Cooperative"},
+            ],
+        })
+
     await send_list_message(
         phone,
         header="AkoweAI",
         body=greeting,
         button_text="View Options",
-        sections=[
-            {
-                "title": "Member Actions",
-                "rows": [
-                    {"id": "pay_now", "title": "💰 Pay Contribution"},
-                    {"id": "my_balance", "title": "📊 My Balance"},
-                    {"id": "full_history", "title": "📜 Payment History"},
-                ],
-            },
-            {
-                "title": "Admin Actions",
-                "rows": [
-                    {"id": "coop_status", "title": "📈 Coop Status"},
-                    {"id": "member_lookup", "title": "🔍 Member Lookup"},
-                    {"id": "broadcast", "title": "📢 Broadcast Message"},
-                    {"id": "ai_summary", "title": "🤖 AI Summary"},
-                ],
-            },
-        ],
+        sections=sections,
     )
 
 
@@ -170,9 +191,28 @@ async def dispatch_intent(
                 phone, pending_intent, pending_entities, session, member, db
             )
             return
-        intent = Intent.UNKNOWN
+        # On-demand switch — show menu scoped to the newly selected coop
+        new_coop_id = session.active_cooperative_id
+        new_coop_obj = next((c for c, _ in coops if c.id == new_coop_id), None)
+        new_coop_name = new_coop_obj.name if new_coop_obj else ""
+        new_coop_role = next(
+            (cm.role for c, cm in coops if c.id == new_coop_id), None
+        )
+        if new_coop_role == Role.EXCO.value:
+            await send_exco_main_menu(
+                phone, member.full_name,
+                coop_name=new_coop_name,
+                multi_coop=len(coops) > 1,
+            )
+        else:
+            await send_member_main_menu(phone, multi_coop=len(coops) > 1)
+        return
 
     coop_id = session.active_cooperative_id
+
+    # Derive active coop name for context display in menus
+    active_coop_obj = next((c for c, _ in coops if c.id == coop_id), None)
+    active_coop_name = active_coop_obj.name if active_coop_obj else ""
 
     # Determine role in the active cooperative
     coop_member_role = next(
@@ -191,9 +231,13 @@ async def dispatch_intent(
     if intent == Intent.REGISTER:
         # Already registered — show appropriate menu
         if is_exco:
-            await send_exco_main_menu(phone, member.full_name)
+            await send_exco_main_menu(
+                phone, member.full_name,
+                coop_name=active_coop_name,
+                multi_coop=len(coops) > 1,
+            )
         else:
-            await send_member_main_menu(phone)
+            await send_member_main_menu(phone, multi_coop=len(coops) > 1)
 
     elif intent == Intent.PAY:
         # If we're in PAY_SELECTION and a period row was selected from the list,
@@ -269,9 +313,13 @@ async def dispatch_intent(
         session.flow_data = {}
         await send_text_message(phone, "Cancelled. ✅")
         if is_exco:
-            await send_exco_main_menu(phone, member.full_name)
+            await send_exco_main_menu(
+                phone, member.full_name,
+                coop_name=active_coop_name,
+                multi_coop=len(coops) > 1,
+            )
         else:
-            await send_member_main_menu(phone)
+            await send_member_main_menu(phone, multi_coop=len(coops) > 1)
 
     elif intent == Intent.GREETING:
         await send_text_message(
@@ -279,9 +327,33 @@ async def dispatch_intent(
             "Hey there! 👋 Great to hear from you.\n\nUse the menu below to pay contributions, check your balance, or manage your cooperative.",
         )
         if is_exco:
-            await send_exco_main_menu(phone, "")
+            await send_exco_main_menu(
+                phone, "",
+                coop_name=active_coop_name,
+                multi_coop=len(coops) > 1,
+            )
         else:
-            await send_member_main_menu(phone)
+            await send_member_main_menu(phone, multi_coop=len(coops) > 1)
+
+    elif intent == Intent.SHOW_SWITCHER:
+        # Don't clear active_cooperative_id — it stays set so SWITCH_COOP
+        # can update it correctly when the user picks from the list
+        session.current_flow = None
+        session.current_step = 0
+        session.flow_data = {}
+        if len(coops) > 1:
+            coop_list = [{"id": str(c.id), "name": c.name} for c, _ in coops]
+            await send_cooperative_switcher(phone, coop_list)
+        else:
+            # Single coop — nothing to switch, just show menu
+            if is_exco:
+                await send_exco_main_menu(
+                    phone, member.full_name,
+                    coop_name=active_coop_name,
+                    multi_coop=False,
+                )
+            else:
+                await send_member_main_menu(phone, multi_coop=False)
 
     else:
         from app.services.intent_service import send_fallback_menu
