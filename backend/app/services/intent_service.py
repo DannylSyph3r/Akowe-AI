@@ -22,7 +22,7 @@ BUTTON_INTENT_MAP: dict[str, Intent] = {
     "view_members": Intent.VIEW_MEMBERS,
     "members_next": Intent.MEMBERS_NEXT,
     "members_prev": Intent.MEMBERS_PREV,
-    "show_menu": Intent.GREETING,
+    "show_menu": Intent.SHOW_MENU,
     "view_unpaid": Intent.VIEW_UNPAID,
     "add_period": Intent.ADD_PERIOD,
     "confirm_pay": Intent.CONFIRM_PAY,

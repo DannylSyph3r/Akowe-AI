@@ -84,4 +84,5 @@ class Intent(str, Enum):
     CANCEL = "CANCEL"
     GREETING = "GREETING"
     SHOW_SWITCHER = "SHOW_SWITCHER"
+    SHOW_MENU = "SHOW_MENU"
     UNKNOWN = "UNKNOWN"
