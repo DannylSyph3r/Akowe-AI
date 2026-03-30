@@ -174,6 +174,14 @@ async def handle_pay_intent(
             phone,
             "✅ You're all caught up! There are no outstanding contributions.",
         )
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [
+                {"id": "my_balance", "title": "📊 My Balance"},
+                {"id": "full_history", "title": "📜 Full History"},
+            ],
+        )
         return
 
     if len(periods) == 1:
@@ -479,6 +487,14 @@ async def handle_history_intent(
     items = result.get("items", [])
     if not items and page == 0:
         await send_text_message(phone, "You have no payment history yet.")
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [
+                {"id": "pay_now", "title": "💰 Pay Now"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
+        )
         return False
 
     lines = [f"📜 *Payment History* (page {page + 1})\n"]
@@ -497,6 +513,18 @@ async def handle_history_intent(
         await send_reply_buttons(
             phone,
             "There are more entries.",
-            [{"id": "show_more_history", "title": "📄 Show More"}],
+            [
+                {"id": "show_more_history", "title": "📄 Show More"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
+        )
+    else:
+        await send_reply_buttons(
+            phone,
+            "That's all your history.",
+            [
+                {"id": "pay_now", "title": "💰 Pay Now"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
         )
     return has_more
