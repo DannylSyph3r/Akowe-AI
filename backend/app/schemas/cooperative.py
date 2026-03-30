@@ -119,6 +119,17 @@ class JoinCodesResponse(BaseModel):
 class ExcoInviteResponse(BaseModel):
     code: str
     expires_at: datetime
+    
+
+class ActiveJoinCodeItem(BaseModel):
+    code: str
+    role: str
+    expires_at: datetime
+    created_at: datetime
+
+
+class ActiveJoinCodesResponse(BaseModel):
+    codes: list[ActiveJoinCodeItem]
 
 
 class PayablePeriodItem(BaseModel):
