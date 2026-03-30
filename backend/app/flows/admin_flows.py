@@ -110,7 +110,8 @@ async def handle_coop_status_intent(
         "What would you like to do?",
         [
             {"id": "send_reminders", "title": "📢 Send Reminders"},
-            {"id": "member_lookup", "title": "🔍 Member Lookup"},
+            {"id": "view_members", "title": "👥 View Members"},
+            {"id": "show_menu", "title": "🏠 Menu"},
         ],
     )
 
@@ -140,6 +141,14 @@ async def handle_member_lookup_flow(
             await _send_member_detail(phone, member_data, coop_id, db)
         else:
             await send_text_message(phone, "Member not found. Please try again.")
+            await send_reply_buttons(
+                phone,
+                "What would you like to do?",
+                [
+                    {"id": "member_lookup", "title": "🔍 Try Again"},
+                    {"id": "show_menu", "title": "🏠 Menu"},
+                ],
+            )
         session.current_flow = None
         session.current_step = 0
         session.flow_data = {}
@@ -164,6 +173,14 @@ async def handle_member_lookup_flow(
 
     if not results:
         await send_text_message(phone, f"No members found matching *{query}*.")
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [
+                {"id": "member_lookup", "title": "🔍 Try Again"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
+        )
         session.current_flow = None
         session.current_step = 0
         session.flow_data = {}
@@ -218,6 +235,15 @@ async def _send_member_detail(
                 lines.append(f"{icon} {item['period_label']}")
 
     await send_text_message(phone, "\n".join(lines))
+    await send_reply_buttons(
+        phone,
+        "What would you like to do?",
+        [
+            {"id": "member_lookup", "title": "🔍 Lookup"},
+            {"id": "view_members", "title": "👥 View Members"},
+            {"id": "show_menu", "title": "🏠 Menu"},
+        ],
+    )
 
 
 # Broadcast flow
@@ -305,6 +331,14 @@ async def handle_broadcast_flow(
         session.current_step = 0
         session.flow_data = {}
         await send_text_message(phone, f"✅ Broadcast sent to {sent_count} member(s).")
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [
+                {"id": "coop_status", "title": "📈 Coop Status"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
+        )
 
 
 # AI financial summary
@@ -345,6 +379,14 @@ async def handle_coop_summary_intent(
         summary = "Unable to generate summary at this time."
 
     await send_text_message(phone, f"📊 *Financial Summary*\n\n{summary}")
+    await send_reply_buttons(
+        phone,
+        "What would you like to do?",
+        [
+            {"id": "coop_status", "title": "📈 Coop Status"},
+            {"id": "show_menu", "title": "🏠 Menu"},
+        ],
+    )
 
 
 # Send reminders
@@ -360,12 +402,29 @@ async def handle_send_reminders_intent(
     open_period = await period_repo.get_open_period(coop_id)
     if not open_period:
         await send_text_message(phone, "No open period found. Nothing to remind.")
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [
+                {"id": "coop_status", "title": "📈 Coop Status"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
+        )
         return
 
     unpaid_members = await coop_repo.get_unpaid_members_for_period(coop_id, open_period.id)
 
     if not unpaid_members:
         await send_text_message(phone, "✅ All members have paid for this period!")
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [
+                {"id": "coop_status", "title": "📈 Coop Status"},
+                {"id": "view_members", "title": "👥 View Members"},
+                {"id": "show_menu", "title": "🏠 Menu"},
+            ],
+        )
         return
 
     coop = await coop_repo.get_by_id(coop_id)
@@ -400,6 +459,15 @@ async def handle_send_reminders_intent(
         phone,
         f"📢 Reminders sent to *{sent_count}* member(s) with outstanding contributions.",
     )
+    await send_reply_buttons(
+        phone,
+        "What would you like to do?",
+        [
+            {"id": "coop_status", "title": "📈 Coop Status"},
+            {"id": "view_members", "title": "👥 View Members"},
+            {"id": "show_menu", "title": "🏠 Menu"},
+        ],
+    )
 
 
 # Member list flow
@@ -428,6 +496,11 @@ async def handle_view_members_flow(
 
     if total == 0:
         await send_text_message(phone, "No members found in this cooperative.")
+        await send_reply_buttons(
+            phone,
+            "What would you like to do?",
+            [{"id": "show_menu", "title": "🏠 Menu"}],
+        )
         return
 
     # Persist current page so next/prev dispatches can read it
