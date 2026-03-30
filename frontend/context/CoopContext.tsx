@@ -4,8 +4,8 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listCooperatives } from "@/lib/api/cooperatives";
@@ -17,41 +17,44 @@ interface CoopContextType {
   setActiveCoop: (coop: CooperativeListItem) => void;
   allCoops: CooperativeListItem[];
   isLoading: boolean;
+  isReady: boolean;
+  hasAccessToken: boolean;
 }
 
 const CoopContext = createContext<CoopContextType | null>(null);
+const noopSubscribe = () => () => {};
 
 export function CoopProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  const [activeCoop, setActiveCoopState] = useState<CooperativeListItem | null>(
-    null,
+  const [selectedCoopId, setSelectedCoopId] = useState<string | null>(
+    typeof window === "undefined"
+      ? null
+      : localStorage.getItem("active_coop_id"),
   );
+  const isReady = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const accessToken = useSyncExternalStore(
+    noopSubscribe,
+    getAccessToken,
+    () => null,
+  );
+  const hasAccessToken = !!accessToken;
 
-  const { data: coops = [], isLoading } = useQuery({
+  const { data: coops = [], isLoading: isCoopsLoading } = useQuery({
     queryKey: ["cooperatives"],
     queryFn: listCooperatives,
     staleTime: 60_000,
-    enabled: !!getAccessToken(),
+    enabled: isReady && hasAccessToken,
   });
 
-  // Restore saved selection or fall back to first coop
-  useEffect(() => {
-    if (coops.length === 0) return;
-
-    const savedId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("active_coop_id")
-        : null;
-
-    const candidate = savedId ? coops.find((c) => c.id === savedId) : null;
-    const target = candidate ?? coops[0];
-
-    setActiveCoopState((prev) => (prev?.id === target.id ? prev : target));
-  }, [coops]);
+  const isLoading = !isReady || (hasAccessToken && isCoopsLoading);
+  const activeCoop =
+    (selectedCoopId ? coops.find((coop) => coop.id === selectedCoopId) : null) ??
+    coops[0] ??
+    null;
 
   const setActiveCoop = useCallback(
     (coop: CooperativeListItem) => {
-      setActiveCoopState(coop);
+      setSelectedCoopId(coop.id);
       localStorage.setItem("active_coop_id", coop.id);
       // Drop all coop-scoped queries so screens refetch for the new coop
       queryClient.removeQueries({ queryKey: ["coop"] });
@@ -61,7 +64,14 @@ export function CoopProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CoopContext.Provider
-      value={{ activeCoop, setActiveCoop, allCoops: coops, isLoading }}
+      value={{
+        activeCoop,
+        setActiveCoop,
+        allCoops: coops,
+        isLoading,
+        isReady,
+        hasAccessToken,
+      }}
     >
       {children}
     </CoopContext.Provider>

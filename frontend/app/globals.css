@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Fonts — Next.js injects these variables via className on <body> */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Fonts */
+  --font-sans:
+    "Aptos", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono:
+    "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+    monospace;
 
   /* Brand */
   --color-primary: #1a7a4a;
@@ -39,6 +43,7 @@ html {
 body {
   background-color: #ffffff;
   color: #111827;
+  font-family: var(--font-sans);
 }
 
 /* Thin scrollbar for overflow containers */

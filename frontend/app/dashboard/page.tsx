@@ -26,7 +26,7 @@ function MetricCard({
   loading: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-border p-5 space-y-3">
+    <div className="space-y-3 rounded-xl border border-border bg-white p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{title}</p>
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -36,7 +36,9 @@ function MetricCard({
       {loading ? (
         <Skeleton className="h-8 w-32" />
       ) : (
-        <p className="text-2xl font-semibold text-foreground">{value}</p>
+        <p className="text-xl font-semibold text-foreground sm:text-2xl">
+          {value}
+        </p>
       )}
     </div>
   );
@@ -62,15 +64,20 @@ export default function DashboardPage() {
   const loading = coopLoading || !coop;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Overview</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {activeCoop?.name ?? "Loading..."}
           </p>
         </div>
-        {activeCoop && <RecordWithdrawalButton coopId={coopId} />}
+        {activeCoop && (
+          <RecordWithdrawalButton
+            coopId={coopId}
+            className="w-full sm:w-auto"
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -100,7 +107,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-5">
+      <div className="rounded-xl border border-border bg-white p-4 sm:p-5">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0 mt-0.5">
             <Sparkles className="w-4 h-4 text-secondary" />
