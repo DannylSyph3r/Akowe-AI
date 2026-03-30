@@ -54,7 +54,7 @@ class StepUpAction(str, Enum):
     SETTINGS = "SETTINGS"
     BROADCAST = "BROADCAST"
     WITHDRAWAL = "WITHDRAWAL"
-    
+
 
 class RiskLevel(str, Enum):
     LOW = "LOW"
@@ -72,6 +72,9 @@ class Intent(str, Enum):
     COOP_SUMMARY = "COOP_SUMMARY"
     BROADCAST = "BROADCAST"
     MEMBER_LOOKUP = "MEMBER_LOOKUP"
+    VIEW_MEMBERS = "VIEW_MEMBERS"
+    MEMBERS_NEXT = "MEMBERS_NEXT"
+    MEMBERS_PREV = "MEMBERS_PREV"
     VIEW_UNPAID = "VIEW_UNPAID"
     ADD_PERIOD = "ADD_PERIOD"
     CONFIRM_PAY = "CONFIRM_PAY"

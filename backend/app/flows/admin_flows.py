@@ -400,3 +400,59 @@ async def handle_send_reminders_intent(
         phone,
         f"📢 Reminders sent to *{sent_count}* member(s) with outstanding contributions.",
     )
+
+
+# Member list flow
+
+_MEMBERS_PAGE_SIZE = 10
+
+
+async def handle_view_members_flow(
+    phone: str,
+    session: ConversationSession,
+    coop_id: UUID,
+    db: AsyncSession,
+    page: int = 0,
+) -> None:
+    """
+    Paginated member roster for exco admins.
+    Displays 10 members per page as a formatted text message.
+    Navigation is entirely button-driven; page state is stored in session.flow_data.
+    """
+    coop_repo = CooperativeRepository(db)
+    offset = page * _MEMBERS_PAGE_SIZE
+    result = await coop_repo.list_members_simple(coop_id, offset, _MEMBERS_PAGE_SIZE)
+
+    total: int = result["total"]
+    members: list[dict] = result["members"]
+
+    if total == 0:
+        await send_text_message(phone, "No members found in this cooperative.")
+        return
+
+    # Persist current page so next/prev dispatches can read it
+    session.flow_data = {**session.flow_data, "members_page": page}
+
+    start_num = offset + 1
+    end_num = offset + len(members)
+    lines = [f"👥 *Members ({start_num}–{end_num} of {total})*\n"]
+    for i, m in enumerate(members, start=start_num):
+        role_label = "👑 Exco" if m["role"] == "exco" else "Member"
+        lines.append(f"{i}. {m['full_name']}  •  {role_label}")
+    body = "\n".join(lines)
+
+    has_prev = page > 0
+    has_next = (offset + _MEMBERS_PAGE_SIZE) < total
+
+    # Build buttons — max 3. Middle pages (prev + next) have no room for lookup.
+    # All other positions (single, first, last) include a lookup shortcut.
+    buttons = []
+    if has_prev:
+        buttons.append({"id": "members_prev", "title": "⬅️ Prev"})
+    if has_next:
+        buttons.append({"id": "members_next", "title": "➡️ Next 10"})
+    if not (has_prev and has_next):
+        buttons.append({"id": "member_lookup", "title": "🔍 Lookup"})
+    buttons.append({"id": "show_menu", "title": "🏠 Menu"})
+
+    await send_reply_buttons(phone, body, buttons)
